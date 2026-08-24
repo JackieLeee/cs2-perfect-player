@@ -443,6 +443,19 @@
       "vrsSource": "hltv.org Valve Regional Standings"
     },
     {
+      "id": "eyeballers",
+      "name": "EYEBALLERS",
+      "nameCn": "EYEBALLERS",
+      "region": "INT",
+      "color": "#878173",
+      "rank": 35,
+      "valveRank": 35,
+      "vrsPoints": 1364,
+      "hltvId": 11737,
+      "logo": "assets/images/teams/eyeballers.webp",
+      "vrsSource": "hltv.org Valve Regional Standings"
+    },
+    {
       "id": "fnatic",
       "name": "fnatic",
       "nameCn": "fnatic",
@@ -518,6 +531,19 @@
       "vrsPoints": 1313,
       "hltvId": 11712,
       "logo": "assets/images/teams/sashi.webp",
+      "vrsSource": "hltv.org Valve Regional Standings"
+    },
+    {
+      "id": "bc-game",
+      "name": "BC.Game",
+      "nameCn": "BC.Game",
+      "region": "INT",
+      "color": "#52a490",
+      "rank": 42,
+      "valveRank": 42,
+      "vrsPoints": 1310,
+      "hltvId": 12878,
+      "logo": "assets/images/teams/bc-game.webp",
       "vrsSource": "hltv.org Valve Regional Standings"
     },
     {
@@ -625,6 +651,19 @@
       "vrsSource": "hltv.org Valve Regional Standings"
     },
     {
+      "id": "wildcard",
+      "name": "Wildcard",
+      "nameCn": "Wildcard",
+      "region": "INT",
+      "color": "#a2b870",
+      "rank": 51,
+      "valveRank": 51,
+      "vrsPoints": 1226,
+      "hltvId": 12257,
+      "logo": "assets/images/teams/wildcard.webp",
+      "vrsSource": "hltv.org Valve Regional Standings"
+    },
+    {
       "id": "flyquest",
       "name": "FlyQuest",
       "nameCn": "FQ",
@@ -674,6 +713,32 @@
       "vrsPoints": 1147,
       "hltvId": 10577,
       "logo": "assets/images/teams/sinners.webp",
+      "vrsSource": "hltv.org Valve Regional Standings"
+    },
+    {
+      "id": "genone",
+      "name": "GenOne",
+      "nameCn": "GenOne",
+      "region": "INT",
+      "color": "#8ab95c",
+      "rank": 56,
+      "valveRank": 56,
+      "vrsPoints": 1144,
+      "hltvId": 11609,
+      "logo": "assets/images/teams/genone.webp",
+      "vrsSource": "hltv.org Valve Regional Standings"
+    },
+    {
+      "id": "phantom",
+      "name": "Phantom",
+      "nameCn": "Phantom",
+      "region": "INT",
+      "color": "#5f56ab",
+      "rank": 57,
+      "valveRank": 57,
+      "vrsPoints": 1140,
+      "hltvId": 13173,
+      "logo": "assets/images/teams/phantom.webp",
       "vrsSource": "hltv.org Valve Regional Standings"
     },
     {

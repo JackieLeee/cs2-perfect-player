@@ -11,7 +11,14 @@ from typing import Any
 
 import aiohttp
 
-from build_cs2_player_pool import ROLE_ATTR_BIAS, calc_ovr, clamp, slug
+from build_cs2_player_pool import slug
+from hltv_calibration import (
+    anchor_ovr,
+    attrs_from_hltv,
+    calibration_rules_note,
+    effective_rating,
+    team_median_from_candidates,
+)
 from fetch_cs2_data import ROLE_OVERRIDES, infer_role
 from fetch_valve_vrs import attach_vrs_to_teams
 from team_registry import (
@@ -124,40 +131,6 @@ def aggregate_player_match_stats(
 
 def _nick_key(name: str) -> str:
     return name.strip().lower()
-
-
-def hltv_stats_to_attrs(stats: dict[str, Any], role: str, peak: bool = False) -> dict[str, int]:
-    rating = float(stats.get("rating") or 1.0)
-    adr = float(stats.get("adr") or 72.0)
-    kast = float(stats.get("kast") or 72.0) / 100.0
-    k = float(stats.get("k") or 14.0)
-    d = max(float(stats.get("d") or 14.0), 0.1)
-    kd = k / d
-    kpr = k / 24.0
-    swing = float(stats.get("swing") or 0.0)
-
-    base = clamp(int(40 + rating * 35))
-    attrs = {
-        "AIM": clamp(int(base + (rating - 1.0) * 20 + (adr - 75) * 0.18)),
-        "REFL": clamp(int(base + (rating - 1.0) * 16 + swing * 1.2)),
-        "SPRY": clamp(int(base + (kpr - 0.72) * 18 + (rating - 1.0) * 8)),
-        "AWPE": clamp(int(base + (kpr - 0.72) * 22 + (adr - 75) * 0.12)),
-        "UTLY": clamp(int(base + (adr - 75) * 0.28 + kast * 10)),
-        "GMSN": clamp(int(base + kast * 14 + (rating - 1.0) * 10)),
-        "COMM": clamp(int(base + kast * 16 + (rating - 1.0) * 6)),
-        "CLUT": clamp(int(base + kd * 6 + (rating - 1.0) * 12)),
-        "ENTR": clamp(int(base + (kpr - 0.72) * 24 + (rating - 1.0) * 10)),
-        "LURK": clamp(int(base + (rating - 1.0) * 14 + swing * 0.8)),
-        "TEAM": clamp(int(base + kast * 18 + (rating - 1.0) * 6)),
-        "MENT": clamp(int(base + (rating - 1.0) * 14 + kast * 8)),
-        "CONS": clamp(int(base + kast * 12 + (1 - abs(kd - 1.05)) * 8)),
-    }
-    for k_attr, bonus in ROLE_ATTR_BIAS.get(role, {}).items():
-        attrs[k_attr] = clamp(attrs[k_attr] + bonus // 2)
-    if peak:
-        for k_attr in attrs:
-            attrs[k_attr] = clamp(attrs[k_attr] + 3)
-    return attrs
 
 
 class HltvClient:
@@ -322,6 +295,7 @@ async def build_player_record(
     kind: str,
     peak: bool,
     team_stats: dict[int, dict[str, Any]],
+    team_median: float,
 ) -> dict[str, Any]:
     pid = int(ref["id"])
     name = ref.get("name") or f"player-{pid}"
@@ -330,17 +304,18 @@ async def build_player_record(
     stats = dict(team_stats.get(pid) or detail.get("stats") or {})
     if not stats.get("rating") and ref.get("best_rating"):
         stats["rating"] = ref["best_rating"]
-    rating = round(float(stats.get("rating") or ref.get("best_rating") or 1.0), 3)
-    attrs = hltv_stats_to_attrs(stats, role, peak)
-    ovr = calc_ovr(attrs, role)
+    raw_rating = round(float(stats.get("rating") or ref.get("best_rating") or 1.0), 3)
     maps = int(stats.get("N") or stats.get("maps_played") or stats.get("maps") or 0)
+    eff_rating = round(effective_rating(raw_rating, maps, team_median), 3)
+    attrs = attrs_from_hltv(stats, role, eff_rating, peak)
+    ovr = anchor_ovr(eff_rating)
     start, end = client.stats_start, client.stats_end
     return {
         "name": name,
         "nameCn": name,
         "teamId": team_id,
         "role": role,
-        "rating": round(rating, 2),
+        "rating": round(eff_rating, 2),
         "ovr": ovr,
         "age": 22,
         "attrs": attrs,
@@ -352,7 +327,8 @@ async def build_player_record(
             "code": 0,
             "provider": "hltv.org",
             "hltvPlayerId": pid,
-            "hltvRating": rating,
+            "hltvRating": raw_rating,
+            "effectiveRating": eff_rating,
             "mapsPlayed": maps,
             "statsWindow": f"{STATS_MONTHS} months",
             "matchType": MATCH_TYPE,
@@ -380,6 +356,7 @@ async def fetch_team_pool(client: HltvClient, team_meta: dict[str, Any]) -> dict
     candidates = await collect_team_players(client, hltv_id, roster, team_stats)
 
     ratings_for_role = [(c["name"], float(c.get("best_rating") or 1.0)) for c in candidates.values()]
+    team_median = team_median_from_candidates(list(candidates.values()), team_stats)
     ordered = sorted(
         candidates.values(),
         key=lambda c: (not c.get("on_roster"), -float(c.get("best_rating") or 0)),
@@ -401,7 +378,7 @@ async def fetch_team_pool(client: HltvClient, team_meta: dict[str, Any]) -> dict
     for ref in current_refs:
         role = infer_role(ref.get("name") or "", "", ratings_for_role)
         current_players.append(
-            await build_player_record(client, team_id, ref, role, "current", False, team_stats)
+            await build_player_record(client, team_id, ref, role, "current", False, team_stats, team_median)
         )
 
     hist_refs = [
@@ -418,7 +395,7 @@ async def fetch_team_pool(client: HltvClient, team_meta: dict[str, Any]) -> dict
         seen_hist.add(key)
         role = infer_role(ref.get("name") or "", "", ratings_for_role)
         historical.append(
-            await build_player_record(client, team_id, ref, role, "historical", True, team_stats)
+            await build_player_record(client, team_id, ref, role, "historical", True, team_stats, team_median)
         )
         if len(historical) >= TARGET_HISTORICAL:
             break
