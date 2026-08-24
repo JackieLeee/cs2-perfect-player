@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>CS2 Perfect Player · 完美选手</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%AE%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="assets/css/cs2-perfect-player.css">
+</head>
+<body>
+<div id="app">
+  <div class="navbar">CS2 <span class="hl">PERFECT PLAYER</span></div>
+
+  <div id="screen-menu" class="screen active">
+    <div class="hero">
+      <div class="hero-desc">从职业选手身上抽取属性，组建你的完美 CS2 选手，征战多赛季：联赛 → 7 项年度赛事 → 年末评选 Top 20 与全部奖项，40 岁退役。</div>
+      <p class="sub" id="menu-era-label">CS2 生涯模式 · Top 50 战队 · 2026 起</p>
+    </div>
+    <div class="menu-actions">
+      <button class="btn btn-primary" id="btn-new">🎮 新游戏</button>
+      <button class="btn btn-secondary" id="btn-continue" style="display:none">▶ 继续</button>
+      <button class="btn btn-secondary" id="btn-help">❓ 玩法说明</button>
+    </div>
+  </div>
+
+  <div id="screen-character" class="screen">
+    <div class="section-title"><h1>创建选手</h1><div class="sub">ID 与头像会贯穿完整生涯</div></div>
+    <div class="character-card">
+      <label class="character-label" for="char-name-input">选手 ID</label>
+      <input class="character-name" id="char-name-input" type="text" placeholder="输入选手 ID" maxlength="12" autocomplete="off">
+      <div class="character-preview-wrap">
+        <div class="character-preview" id="char-preview">?</div>
+      </div>
+      <div class="character-label">选择头像</div>
+      <div class="character-avatar-tabs" id="char-avatar-tabs"></div>
+      <div class="character-avatar-grid" id="char-avatar-grid"></div>
+      <div class="character-error" id="char-error"></div>
+      <button class="btn btn-primary" id="btn-char-next">确认创建 →</button>
+    </div>
+  </div>
+
+  <div id="screen-role" class="screen">
+    <div class="section-title"><h1>选择角色</h1><div class="sub">影响 OVR 权重与跨角色衰减</div></div>
+    <div class="role-grid" id="role-grid"></div>
+    <button class="btn btn-primary" id="btn-confirm-role" disabled>开始构建属性 →</button>
+  </div>
+
+  <div id="screen-build" class="screen">
+    <div class="section-title"><h1>建选手</h1><div class="sub">随机战队 → 选手 → 锁定属性</div></div>
+    <div id="build-pos-indicator">--</div>
+    <div id="build-progress-area"></div>
+    <div class="build-split">
+      <div class="build-left">
+        <div class="bl-header">
+          <span class="bl-ovr" id="bl-ovr">--</span>
+          <span class="bl-label">OVR</span>
+        </div>
+        <div class="bl-attrs" id="bl-attrs"></div>
+        <div class="bl-footer" id="bl-footer"></div>
+      </div>
+      <div class="build-right">
+        <div id="br-slot-area"></div>
+        <div id="br-roster-area"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="screen-reveal" class="screen">
+    <div class="section-title"><h1>选手揭幕</h1></div>
+    <div id="reveal-content"></div>
+    <button class="btn btn-primary" id="btn-reveal-team">选择战队 →</button>
+  </div>
+
+  <div id="screen-team" class="screen">
+    <div class="section-title"><h1>选择战队</h1><div class="sub">随机或自选你的生涯主队</div></div>
+    <div id="career-area"></div>
+    <div id="career-reveal" style="display:none"></div>
+    <button class="btn btn-primary" id="btn-confirm-team" style="display:none;margin-top:12px">🏆 开始赛季</button>
+  </div>
+
+  <div id="screen-season" class="screen">
+    <div class="season-header">
+      <div id="season-team-name">--</div>
+      <div class="season-record" id="season-record">0-0</div>
+      <div class="sub" id="season-progress">联赛 0/18</div>
+      <div id="season-next" class="sub"></div>
+    </div>
+    <div class="vitals-grid" id="vitals-grid"></div>
+    <div class="my-stats-panel" id="my-stats-panel"></div>
+    <div class="match-log-title">我的最近比赛</div>
+    <div class="match-log-panel" id="match-log-panel"></div>
+    <div class="schedule-dots" id="schedule-dots"></div>
+    <div class="last-match" id="last-match"></div>
+    <div id="season-actions"></div>
+    <button class="btn btn-secondary" id="btn-menu" style="margin-top:12px">返回主菜单</button>
+  </div>
+
+  <div id="screen-playoffs" class="screen">
+    <div class="section-title"><h1>年度赛事</h1><div class="sub">季后赛 · IEM · BLAST · EPL · Major</div></div>
+    <div class="my-stats-panel" id="po-my-stats"></div>
+    <div class="match-log-title">我的最近比赛</div>
+    <div class="match-log-panel" id="po-match-log"></div>
+    <div id="playoffs-content"></div>
+    <button class="btn btn-secondary" id="btn-rankings-po" style="margin-top:8px">📊 排行榜</button>
+    <button class="btn btn-secondary" id="btn-menu-po" style="margin-top:12px">返回主菜单</button>
+  </div>
+
+  <div id="screen-rankings" class="screen">
+    <div class="section-title"><h1>排行榜</h1><div class="sub">战队 VRS · 选手综合排名</div></div>
+    <div id="rankings-content"></div>
+    <button class="btn btn-secondary" id="btn-rankings-back" style="margin-top:12px">返回赛季</button>
+  </div>
+
+  <div id="screen-awards" class="screen">
+    <div class="section-title"><h1>年度奖项</h1><div class="sub" id="awards-sub">全部赛事结束后评选</div></div>
+    <div id="awards-content"></div>
+    <div id="awards-footer"></div>
+  </div>
+
+  <div id="screen-results" class="screen">
+    <div id="results-content"></div>
+    <div id="awards-list-results"></div>
+    <button class="btn btn-primary" id="btn-next-season" style="display:none">继续下赛季</button>
+    <button class="btn btn-secondary" id="btn-menu-res" style="margin-top:12px">返回主菜单</button>
+  </div>
+
+  <div id="screen-mycard" class="screen"></div>
+</div>
+
+<div id="pp-toast"></div>
+
+<div id="helpModal" class="modal-overlay" style="display:none">
+  <div class="modal-content">
+    <div class="modal-header"><b>玩法说明</b><button class="help-close" id="help-close">✕</button></div>
+    <p style="font-size:14px;line-height:1.6;color:var(--text-dim)">
+      1. 创建选手并选择角色（IGL/AWP/Entry/Lurk/Support）<br>
+      2. 13 轮：随机战队 → 选手 → 锁定 1 项属性<br>
+      3. 每轮 5 张现役选手卡，3 次换人<br>
+      4. 18 场联赛 BO1 → 7 项年度赛事（可逐步或一键模拟）<br>
+      5. 赛季页/赛事页可查看<strong>你的 Rating、K/D/A、ADR</strong> 与最近比赛记录<br>
+      6. 排行榜：战队按 <strong>VRS 积分</strong>（初始来自 HLTV Valve 排名），选手综合排名<br>
+      7. 年末公布 Top 20、MVP 等全部奖项 · 随机事件与成就<br>
+      <br><b>选手数据说明</b>：Rating 与属性来自 HLTV.org <strong>Big Events · 近 12 个月</strong>（Rating 2.0、ADR、KAST 等），与 HLTV 选手统计页筛选一致。<br>
+      <b>VRS 说明</b>：初始积分来自 HLTV Valve Regional Standings；赛季内随胜负与赛事成绩动态变化。
+    </p>
+  </div>
+</div>
+
+<div id="eventModal" class="modal-overlay" style="display:none">
+  <div class="modal-content">
+    <div class="modal-header"><b id="event-title">事件</b><button class="event-close" id="event-close">✕</button></div>
+    <p id="event-body" style="margin-bottom:12px;font-size:14px;line-height:1.5"></p>
+    <div id="event-choices"></div>
+  </div>
+</div>
+
+<script src="assets/js/cs2-headshots.js"></script>
+<script src="assets/js/cs2-core.js"></script>
+<script src="assets/js/cs2-sim.js"></script>
+<script src="assets/js/cs2-rankings.js"></script>
+<script src="assets/js/cs2-event-library.js"></script>
+<script src="assets/js/cs2-awards.js"></script>
+<script src="assets/js/cs2-enhancements.js"></script>
+<script src="assets/js/cs2-perfect-player.js"></script>
+</body>
+</html>

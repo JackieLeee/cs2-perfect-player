@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="g-3dmax" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#003366"/>
+      <stop offset="100%" stop-color="#ffffff"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="32" fill="url(#g-3dmax)"/>
+  <circle cx="128" cy="128" r="88" fill="none" stroke="#ffffff" stroke-width="6" opacity="0.35"/>
+  <text x="128" y="142" text-anchor="middle" fill="#ffffff"
+        font-family="Segoe UI, Arial Black, sans-serif" font-size="48" font-weight="900" letter-spacing="1">3DM</text>
+</svg>

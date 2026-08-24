@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "count": 18,
+  "format": "PNG",
+  "width": 512,
+  "height": 512,
+  "transparent": true,
+  "groups": {
+    "亚洲": 6,
+    "白人": 6,
+    "黑人": 6
+  },
+  "avatars": [
+    { "id": "avatar-01", "group": "亚洲", "photoLocal": "assets/images/character-avatars/avatar-01.png" },
+    { "id": "avatar-02", "group": "亚洲", "photoLocal": "assets/images/character-avatars/avatar-02.png" },
+    { "id": "avatar-03", "group": "亚洲", "photoLocal": "assets/images/character-avatars/avatar-03.png" },
+    { "id": "avatar-04", "group": "亚洲", "photoLocal": "assets/images/character-avatars/avatar-04.png" },
+    { "id": "avatar-05", "group": "亚洲", "photoLocal": "assets/images/character-avatars/avatar-05.png" },
+    { "id": "avatar-06", "group": "亚洲", "photoLocal": "assets/images/character-avatars/avatar-06.png" },
+    { "id": "avatar-07", "group": "白人", "photoLocal": "assets/images/character-avatars/avatar-07.png" },
+    { "id": "avatar-08", "group": "白人", "photoLocal": "assets/images/character-avatars/avatar-08.png" },
+    { "id": "avatar-09", "group": "白人", "photoLocal": "assets/images/character-avatars/avatar-09.png" },
+    { "id": "avatar-10", "group": "白人", "photoLocal": "assets/images/character-avatars/avatar-10.png" },
+    { "id": "avatar-11", "group": "白人", "photoLocal": "assets/images/character-avatars/avatar-11.png" },
+    { "id": "avatar-12", "group": "白人", "photoLocal": "assets/images/character-avatars/avatar-12.png" },
+    { "id": "avatar-13", "group": "黑人", "photoLocal": "assets/images/character-avatars/avatar-13.png" },
+    { "id": "avatar-14", "group": "黑人", "photoLocal": "assets/images/character-avatars/avatar-14.png" },
+    { "id": "avatar-15", "group": "黑人", "photoLocal": "assets/images/character-avatars/avatar-15.png" },
+    { "id": "avatar-16", "group": "黑人", "photoLocal": "assets/images/character-avatars/avatar-16.png" },
+    { "id": "avatar-17", "group": "黑人", "photoLocal": "assets/images/character-avatars/avatar-17.png" },
+    { "id": "avatar-18", "group": "黑人", "photoLocal": "assets/images/character-avatars/avatar-18.png" }
+  ]
+}
