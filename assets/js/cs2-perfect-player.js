@@ -14,17 +14,17 @@
   let activeAvatarGroup = AVATAR_GROUPS[0];
   const HS = window.CS2_HEADSHOTS;
 
-  const SLOT = { ITEM_H: 38, COPIES: 5, spinning: false, built: false };
+  const SLOT = { ITEM_H: 28, COPIES: 5, spinning: false, built: false };
 
   const PP = {
     screen: 'menu', role: null, playerName: '', avatar: '',
     build: {
-      team: null, drawPlayers: [], rerollsLeft: 3, swapsLeft: 3,
+      team: null, drawPlayers: [], teamSwapsLeft: 3,
       selectedPlayer: null, lockedAttrs: {}, attrSlots: {}, lockCount: 0,
       usedPlayers: new Set(), sourceRoll: null, sourceHistory: [],
       mustLockAfterSpin: false, locking: false
     },
-    attributePool: null, career: null, season: null, leagueReady: false, busy: false, adRerollsLeft: 3
+    attributePool: null, career: null, season: null, leagueReady: false, busy: false, adTeamSwapsLeft: 3
   };
   window.PP = PP;
 
@@ -98,37 +98,35 @@
     if (!content) return;
     let html = `<div class="rank-tabs">
       <button type="button" class="rank-tab ${PP.rankTab === 'teams' ? 'active' : ''}" data-tab="teams">战队 VRS</button>
-      <button type="button" class="rank-tab ${PP.rankTab === 'players' ? 'active' : ''}" data-tab="players">选手排名</button>
+      <button type="button" class="rank-tab ${PP.rankTab === 'players' ? 'active' : ''}" data-tab="players">选手 Rating</button>
     </div>`;
     if (PP.rankTab === 'teams') {
       const teams = RANK.sortedTeamVrs(s);
       const userTeam = PP.career.teamId;
-      html += `<div class="rank-list">${teams.slice(0, 30).map((t, i) => {
+      html += `<div class="rank-table-head rank-team-head"><span>#</span><span>战队</span><span>VRS</span><span>W-L</span></div>`;
+      html += `<div class="rank-list">${teams.slice(0, 40).map((t, i) => {
         const isUser = t.team === userTeam;
-        return `<div class="rank-row ${isUser ? 'user' : ''}">
-          <span class="rank-num">#${i + 1}</span>
-          ${C.teamLogoHtml(t.meta, 24)}
-          <span class="rank-name">${esc(t.meta.nameCn || t.meta.name)}${isUser ? ' <b class="you">你</b>' : ''}</span>
-          <span class="rank-val">${t.vrs} VRS</span>
-          <span class="rank-sub">Valve #${t.valveRank || '—'}</span>
+        const rec = s.standings && s.standings[t.team];
+        const wl = rec ? `${rec.wins || 0}-${rec.losses || 0}` : '—';
+        return `<div class="rank-row rank-team-row ${isUser ? 'user' : ''}">
+          <span class="rank-num">${i + 1}</span>
+          <span class="rank-name">${esc(t.meta.nameCn || t.meta.name)}</span>
+          <span class="rank-val">${t.vrs}</span>
+          <span class="rank-data">${wl}</span>
         </div>`;
       }).join('')}</div>`;
-      const ur = RANK.userTeamVrsRank(s, userTeam);
-      html += `<div class="rank-foot sub">你的战队 VRS 排名：${ur ? '#' + ur : '—'} · 积分 ${s.vrs[userTeam] || '—'}</div>`;
     } else {
       const players = RANK.buildPlayerRankings({ career: PP.career, season: s });
-      html += `<div class="rank-list">${players.slice(0, 30).map((p, i) => {
+      html += `<div class="rank-table-head rank-player-head"><span>#</span><span>选手</span><span>Rating</span><span>OVR</span></div>`;
+      html += `<div class="rank-list">${players.slice(0, 40).map((p, i) => {
         const tm = C.teamMeta(p.team);
-        return `<div class="rank-row ${p.isUser ? 'user' : ''}">
-          <span class="rank-num">#${i + 1}</span>
-          <span class="rank-name">${p.isUser ? '⭐ ' : ''}${esc(p.name)}</span>
-          <span class="rank-sub">${esc(tm.nameCn || tm.name)} · ${p.role}</span>
-          <span class="rank-val">OVR ${p.ovr}</span>
-          <span class="rank-sub">Rtg ${p.rating || '—'}</span>
+        return `<div class="rank-row rank-player-row ${p.isUser ? 'user' : ''}">
+          <span class="rank-num">${i + 1}</span>
+          <span class="rank-name">${esc(p.name)}<em>${esc(tm.nameCn || tm.name)}</em></span>
+          <span class="rank-val">${p.rating != null ? p.rating : '—'}</span>
+          <span class="rank-data">${p.ovr || '—'}</span>
         </div>`;
       }).join('')}</div>`;
-      const pr = RANK.userPlayerRank({ career: PP.career, season: s });
-      html += `<div class="rank-foot sub">你的选手排名：${pr ? '#' + pr : '—'} · 赛季 Rating ${s.playerStats.rating || '—'}</div>`;
     }
     content.innerHTML = html;
     Array.from(content.querySelectorAll('.rank-tab')).forEach(btn => {
@@ -192,21 +190,16 @@
     return '现役';
   }
 
-  function getRolePenalty(userRole, srcRole, key) {
-    const srcAvg = C.ROLE_AVG[srcRole] && C.ROLE_AVG[srcRole][key];
-    const userAvg = C.ROLE_AVG[userRole] && C.ROLE_AVG[userRole][key];
-    if (!srcAvg || srcAvg <= 0) return 1;
-    return Math.min(1, userAvg / srcAvg);
-  }
+  function getRolePenalty() { return 1; }
 
   function buildReset() {
     PP.build = {
-      team: null, drawPlayers: [], rerollsLeft: 3, swapsLeft: 3,
+      team: null, drawPlayers: [], teamSwapsLeft: 3,
       selectedPlayer: null, lockedAttrs: {}, attrSlots: {}, lockCount: 0,
       usedPlayers: new Set(), sourceRoll: null, sourceHistory: [],
       mustLockAfterSpin: false, locking: false
     };
-    PP.adRerollsLeft = 3;
+    PP.adTeamSwapsLeft = 3;
     SLOT.built = false;
     SLOT.spinning = false;
   }
@@ -217,10 +210,11 @@
     return pool[teamId].players || [];
   }
 
-  function drawBuildPlayers(teamId, count) {
+  function drawBuildPlayers(teamId) {
     const uniqueCurrent = dedupePlayersByName(getTeamPool(teamId));
-    const source = C.shuffle(uniqueCurrent.slice()).filter(p => !PP.build.usedPlayers.has(playerIdentityKey(p)));
-    return source.slice(0, Math.min(count || 5, source.length));
+    return uniqueCurrent
+      .filter(p => !PP.build.usedPlayers.has(playerIdentityKey(p)))
+      .sort((a, b) => (b.ovr || 0) - (a.ovr || 0));
   }
 
   async function loadAvatarManifest() {
@@ -266,13 +260,13 @@
     return { teamId: id };
   }
 
-  function applySpinResult(target) {
+  function applySpinResult(target, opts) {
     if (!target) return null;
     PP.build.team = target.teamId;
     PP._teamsVisited = PP._teamsVisited || [];
     if (!PP._teamsVisited.includes(target.teamId)) PP._teamsVisited.push(target.teamId);
-    PP.build.drawPlayers = drawBuildPlayers(target.teamId, 5);
-    PP.build.swapsLeft = 3;
+    PP.build.drawPlayers = drawBuildPlayers(target.teamId);
+    if (!opts || !opts.keepSwaps) PP.build.teamSwapsLeft = 3;
     PP.build.selectedPlayer = null;
     PP.build.mustLockAfterSpin = true;
     PP.build.sourceRoll = { teamId: target.teamId };
@@ -397,16 +391,17 @@
     spinTeam({ animate: true });
   }
 
-  function getRerollPlayersBtnHtml() {
+  function getSwapTeamBtnHtml() {
     const b = PP.build;
     const hasTeam = !!b.team;
-    if (b.swapsLeft > 0) {
-      return `<button type="button" class="btn btn-sm slot-btn" id="btn-swap-slot" ${hasTeam ? '' : 'disabled'}>🔄 换一批 (${b.swapsLeft})</button>`;
+    const canSwap = b.mustLockAfterSpin && !SLOT.spinning;
+    if (b.teamSwapsLeft > 0) {
+      return `<button type="button" class="btn btn-sm slot-btn" id="btn-swap-team" ${hasTeam && canSwap ? '' : 'disabled'}>🔁 换战队 (${b.teamSwapsLeft})</button>`;
     }
-    if (PP.adRerollsLeft <= 0) {
-      return `<button type="button" class="btn btn-sm slot-btn" disabled>📺 广告重选已用完</button>`;
+    if (PP.adTeamSwapsLeft <= 0) {
+      return `<button type="button" class="btn btn-sm slot-btn" disabled>换战队已用完</button>`;
     }
-    return `<button type="button" class="btn btn-sm slot-btn" id="btn-ad-slot" ${hasTeam ? '' : 'disabled'} style="background:linear-gradient(135deg,#3a2a1a,#2a2015);color:#f5d060;border-color:#d4af37;">📺 广告重选 (${PP.adRerollsLeft})</button>`;
+    return `<button type="button" class="btn btn-sm slot-btn" id="btn-ad-team" ${hasTeam && canSwap ? '' : 'disabled'} style="background:linear-gradient(135deg,#3a2a1a,#2a2015);color:#f5d060;border-color:#d4af37;">📺 广告换队 (${PP.adTeamSwapsLeft})</button>`;
   }
 
   function updateSlotButtons() {
@@ -418,21 +413,21 @@
     if (actions) {
       actions.innerHTML = `
         <button type="button" class="btn btn-sm slot-btn" id="btn-pull-handle" ${canSpin ? '' : 'disabled'} style="background:var(--orange);color:#fff;${canSpin ? '' : 'opacity:.35;'}">🎲 随机战队</button>
-        ${getRerollPlayersBtnHtml()}`;
+        ${getSwapTeamBtnHtml()}`;
       bindSlotActionButtons();
     }
     if (warn) {
-      warn.textContent = PP.build.mustLockAfterSpin ? '⚠️ 先选择选手并锁定属性才能再次随机' : '';
+      warn.textContent = PP.build.mustLockAfterSpin ? '先锁定属性才能进入下一轮' : '';
     }
   }
 
   function bindSlotActionButtons() {
     const pull = $('btn-pull-handle');
     if (pull) pull.onclick = pullHandle;
-    const swap = $('btn-swap-slot');
-    if (swap) swap.onclick = () => { rerollTeamPlayers(); renderBuild(); };
-    const ad = $('btn-ad-slot');
-    if (ad) ad.onclick = () => { adRerollTeam(); renderBuild(); };
+    const swap = $('btn-swap-team');
+    if (swap) swap.onclick = () => { swapTeam(); renderBuild(); };
+    const ad = $('btn-ad-team');
+    if (ad) ad.onclick = () => { adSwapTeam(); renderBuild(); };
   }
 
   function updateSlotResultPanel() {
@@ -441,29 +436,12 @@
     const b = PP.build;
     if (!b.team) { panel.innerHTML = ''; return; }
     const meta = C.teamMeta(b.team);
-    const remaining = C.ATTR_KEYS.filter(k => b.lockedAttrs[k] == null).length;
-    const selectedName = b.selectedPlayer ? b.selectedPlayer.name : '待选择';
-    const selectedSource = b.selectedPlayer
-      ? `${sourceKindLabel()} · ${b.selectedPlayer.role || 'Entry'}`
-      : '现役名单';
     panel.innerHTML = `
-      <div class="slot-result-card">
-        <div class="slot-team">
-          ${C.teamLogoHtml(meta, 44).replace('tp-logo', 'slot-logo tp-logo')}
-          <div>
-            <div class="slot-team-name">${esc(meta.nameCn || meta.name)}</div>
-            <div class="slot-team-sub">现役选手 · 还需锁定 ${remaining} 项</div>
-          </div>
-        </div>
-        <div class="slot-source-chain">
-          <span class="source-chip">战队 ${esc(meta.nameCn || meta.name)}</span><b>→</b>
-          <span class="source-chip">选手 ${esc(selectedName)}</span>
-        </div>
-        <div class="slot-source-note">来源：${esc(selectedSource)}</div>
-        <div class="slot-hint">${b.selectedPlayer ? `已选择 ${esc(b.selectedPlayer.name)}，点击左侧属性锁定，或 <button type="button" class="link-btn" id="btn-open-lock">查看全部属性</button>` : '👆 选择一名选手，再锁定一项属性'}</div>
+      <div class="slot-result-compact">
+        ${C.teamLogoHtml(meta, 28).replace('tp-logo', 'slot-logo tp-logo')}
+        <span class="slot-team-name">${esc(meta.nameCn || meta.name)}</span>
+        <span class="slot-team-count">${b.drawPlayers.length} 人可选</span>
       </div>`;
-    const openLock = $('btn-open-lock');
-    if (openLock) openLock.onclick = () => openAttrLockModal(b.selectedPlayer);
   }
 
   function renderTeamPicker() {
@@ -475,23 +453,17 @@
     });
     const canSpin = !PP.build.mustLockAfterSpin && !SLOT.spinning;
     box.innerHTML = `
-      <div class="br-slot-area-inner">
-        <div class="br-slot-label">🎰 随机战队</div>
-        <div class="br-slot-single">
-          <div class="br-slot-col">
-            <div class="br-slot-col-label">战队</div>
-            <div class="br-slot-wrapper">
-              <div class="br-slot-machine">
-                <div class="br-slot-reel" id="slot-reel-team">${buildReelHtml(teams, 'team')}</div>
-              </div>
-            </div>
+      <div class="br-slot-area-inner br-slot-compact">
+        <div class="br-slot-wrapper">
+          <div class="br-slot-machine br-slot-machine-sm">
+            <div class="br-slot-reel" id="slot-reel-team">${buildReelHtml(teams, 'team')}</div>
           </div>
         </div>
         <div class="br-slot-actions">
-          <button type="button" class="btn btn-sm slot-btn" id="btn-pull-handle" ${canSpin ? '' : 'disabled'} style="background:var(--orange);color:#fff;${canSpin ? '' : 'opacity:.35;'}">🎲 随机战队</button>
-          ${getRerollPlayersBtnHtml()}
+          <button type="button" class="btn btn-sm slot-btn" id="btn-pull-handle" ${canSpin ? '' : 'disabled'} style="background:var(--orange);color:#fff;${canSpin ? '' : 'opacity:.35;'}">🎲 随机</button>
+          ${getSwapTeamBtnHtml()}
         </div>
-        <div class="br-slot-warn">${PP.build.mustLockAfterSpin ? '⚠️ 先选择选手并锁定属性才能再次随机' : ''}</div>
+        <div class="br-slot-warn">${PP.build.mustLockAfterSpin ? '先锁定属性才能进入下一轮' : ''}</div>
         <div id="slot-result-panel"></div>
       </div>`;
     SLOT.built = true;
@@ -504,20 +476,24 @@
     updateSlotResultPanel();
   }
 
-  function rerollTeamPlayers() {
-    if (!PP.build.team || PP.build.swapsLeft <= 0) return;
-    PP.build.swapsLeft--;
-    PP.build.drawPlayers = drawBuildPlayers(PP.build.team, 5);
-    PP.build.selectedPlayer = null;
-    showToast('已换一批选手');
+  function swapTeam() {
+    if (!PP.build.team || PP.build.teamSwapsLeft <= 0 || !PP.build.mustLockAfterSpin) return;
+    const target = pickSpinTargets();
+    if (!target) return;
+    PP.build.teamSwapsLeft--;
+    applySpinResult(target, { keepSwaps: true });
+    if (SLOT.built) highlightSpinResult(target);
+    showToast('已换战队');
   }
 
-  function adRerollTeam() {
-    if (PP.adRerollsLeft <= 0 || !PP.build.team) return;
-    PP.adRerollsLeft--;
-    PP.build.drawPlayers = drawBuildPlayers(PP.build.team, 5);
-    PP.build.selectedPlayer = null;
-    showToast('广告重选完成');
+  function adSwapTeam() {
+    if (PP.adTeamSwapsLeft <= 0 || !PP.build.team || !PP.build.mustLockAfterSpin) return;
+    const target = pickSpinTargets();
+    if (!target) return;
+    PP.adTeamSwapsLeft--;
+    applySpinResult(target, { keepSwaps: true });
+    if (SLOT.built) highlightSpinResult(target);
+    showToast('广告换队完成');
   }
 
   function pickPlayerAt(index) {
@@ -525,12 +501,6 @@
     if (!p || PP.build.usedPlayers.has(playerIdentityKey(p))) return;
     PP.build.selectedPlayer = p;
     renderBuild();
-  }
-
-  function swapPlayer() {
-    if (!PP.build.drawPlayers.length || PP.build.swapsLeft <= 0) return null;
-    rerollTeamPlayers();
-    return PP.build.selectedPlayer;
   }
 
   function playerAttrs13(p) {
@@ -555,18 +525,14 @@
     overlay.innerHTML = `<div class="modal-content">
       <div class="modal-header"><span class="help-title">锁定属性 · ${esc(p.name)}</span><button class="modal-close" type="button">✕</button></div>
       <div class="attr-lock-grid">${avail.map(k => {
-        const raw = parseNum(playerAttrs13(p)[k], 55);
-        const pen = getRolePenalty(PP.role, srcRole, k);
-        const val = clamp(Math.round(raw * pen), 25, 99);
+        const val = clamp(Math.round(parseNum(playerAttrs13(p)[k], 55)), 25, 99);
         const g = C.getGrade(val);
         return `<button class="attr-lock-cell" type="button" data-k="${k}">
           <div class="alc-name">${C.ATTR_CN[k]}</div>
           <div class="alc-val">${val}</div>
-          <div class="alc-grade" style="color:${g.color}">${g.letter}${pen < 1 ? ' ↓' : ''}</div>
+          <div class="alc-grade" style="color:${g.color}">${g.letter}</div>
         </button>`;
-      }).join('')}</div>
-      <div class="slot-hint" style="margin-top:10px;">跨角色属性会按均值比例衰减（↓ 标记）。也可直接点击左侧属性栏锁定。</div>
-    </div>`;
+      }).join('')}</div></div>`;
     document.body.appendChild(overlay);
     const close = () => overlay.remove();
     overlay.querySelector('.modal-close').onclick = close;
@@ -583,11 +549,9 @@
     if (!p) { showToast('请先选择一名选手'); return; }
     b.locking = true;
     const srcRole = p.role || 'Entry';
-    const raw = parseNum(playerAttrs13(p)[key], parseNum(p.ovr, 60));
-    const pen = getRolePenalty(PP.role, srcRole, key);
-    const val = clamp(Math.round(raw * pen), 25, 99);
+    const val = clamp(Math.round(parseNum(playerAttrs13(p)[key], parseNum(p.ovr, 60))), 25, 99);
     b.lockedAttrs[key] = val;
-    b.attrSlots[key] = { playerName: p.name, playerKind: sourceKindLabel(p), value: val, raw, penalty: pen };
+    b.attrSlots[key] = { playerName: p.name, playerKind: sourceKindLabel(p), value: val, raw: val, penalty: 1 };
     b.usedPlayers.add(playerIdentityKey(p));
     b.sourceHistory.push({
       attrKey: key, attrName: C.ATTR_CN[key], value: val, playerName: p.name,
@@ -596,8 +560,7 @@
     b.lockCount = Object.keys(b.lockedAttrs).length;
     b.selectedPlayer = null;
     b.mustLockAfterSpin = false;
-    const penTxt = pen < 1 ? `（跨角色衰减 ${Math.round((1 - pen) * 100)}%）` : '';
-    showToast(`${C.ATTR_CN[key]} 已锁定：${val} ${penTxt}`);
+    showToast(`${C.ATTR_CN[key]} 已锁定：${val}`);
     b.locking = false;
     if (b.lockCount >= C.ATTR_KEYS.length) {
       setTimeout(revealPlayer, 500);
@@ -704,7 +667,7 @@
     const res = SIM.simEventStep(s, PP.career.teamId, PP.career);
     const ev = SIM.getActiveEvent(s);
     if (ev && ev.status === 'complete') {
-      SIM.advanceToNextEvent(s, PP.career.teamId);
+      SIM.advanceToNextEvent(s, PP.career.teamId, PP.career);
       if (s.phase === 'complete') {
         finishSeason();
         return;
@@ -1023,11 +986,9 @@
         const g = C.getGrade(val);
         inner = `<span class="ba-label">${C.ATTR_CN[k]}</span><span class="ba-grade" style="color:${g.color}">${g.letter}</span><span class="ba-owner">${esc(slot && slot.playerName || '')}</span>`;
       } else if (b.selectedPlayer) {
-        const raw = parseNum(playerAttrs13(b.selectedPlayer)[k], 55);
-        const pen = getRolePenalty(PP.role, b.selectedPlayer.role, k);
-        const adj = clamp(Math.round(raw * pen), 25, 99);
+        const adj = clamp(Math.round(parseNum(playerAttrs13(b.selectedPlayer)[k], 55)), 25, 99);
         const g = C.getGrade(adj);
-        inner = `<span class="ba-label">${C.ATTR_CN[k]}</span><span class="ba-grade" style="color:${g.color}">${g.letter}</span><span class="ba-owner" style="${pen < 1 ? 'color:var(--orange)' : ''}">${adj}${pen < 1 ? '▼' : ''}</span>`;
+        inner = `<span class="ba-label">${C.ATTR_CN[k]}</span><span class="ba-grade" style="color:${g.color}">${g.letter}</span><span class="ba-owner">${adj}</span>`;
       } else {
         inner = `<span class="ba-label">${C.ATTR_CN[k]}</span><span class="ba-empty">+</span>`;
       }
@@ -1038,9 +999,7 @@
     });
     const footer = $('bl-footer');
     if (footer) {
-      footer.innerHTML = b.lockCount < 13
-        ? '随机战队 → 选手 → 锁定 1 项属性'
-        : '<span style="color:var(--gold)">全部属性已锁定！</span>';
+      footer.innerHTML = b.lockCount < 13 ? '选选手 → 锁属性' : '<span style="color:var(--gold)">完成</span>';
     }
   }
 
@@ -1081,33 +1040,22 @@
       const t13 = playerAttrs13(p);
       const top3 = C.ATTR_KEYS.filter(k => b.lockedAttrs[k] == null)
         .map(k => ({ k, v: parseNum(t13[k], 55) }))
-        .sort((x, y) => y.v - x.v).slice(0, 3);
-      const attrsTxt = top3.map(x => `${C.ATTR_CN[x.k]} ${x.v}`).join(' / ');
+        .sort((x, y) => y.v - x.v).slice(0, 2);
+      const attrsTxt = top3.map(x => `${C.ATTR_CN[x.k]} ${x.v}`).join(' · ');
       const ovr = p.ovr || C.calcOVR(t13, p.role);
       return `<div class="br-player ${sel ? 'selected' : ''} ${used ? 'used' : ''}" data-idx="${i}" data-card-key="${esc(cardKey)}">
         <div class="bp-left">
-          ${playerHeadshotHtml(p, 32)}
+          ${playerHeadshotHtml(p, 28)}
           <div>
             <div class="bp-name">${esc(p.name)}</div>
-            <div class="bp-detail">${p.role} · 现役 · OVR ${ovr}</div>
+            <div class="bp-detail">${p.role} · OVR ${ovr}</div>
             <div class="bp-attrs-preview">${attrsTxt}</div>
           </div>
         </div>
-        <div class="bp-meta">
-          <span class="bp-ovr">${ovr}</span>
-        </div>
+        <span class="bp-ovr">${ovr}</span>
       </div>`;
     }).join('');
-    box.innerHTML = `
-      <div class="br-roster-header">
-        <span class="br-roster-title">${esc(meta.nameCn || meta.name)}</span>
-        <span class="br-roster-sub">本轮 ${b.drawPlayers.length} 名现役 · 同轮不重复</span>
-      </div>
-      <div class="br-roster-list">${list}</div>
-      <div class="roster-footnote">
-        <span>${b.drawPlayers.some(p => p.role !== PP.role) ? '⚠️ 跨角色衰减生效' : '✅ 同角色无衰减'}</span>
-        <span class="hint-action">👆 选选手 → 锁属性</span>
-      </div>`;
+    box.innerHTML = `<div class="br-roster-list">${list}</div>`;
     Array.from(box.querySelectorAll('.br-player')).forEach(el => {
       if (el.classList.contains('used')) return;
       el.onclick = () => {
@@ -1345,9 +1293,12 @@
       actions.innerHTML = `${rankBtn}<button class="btn btn-primary" id="btn-events">📅 进入年度赛事</button>`;
       $('btn-events').onclick = enterEventCalendar;
     } else if (s.phase === 'events' || s.phase === 'playoffs' || s.phase === 'major') {
-      const cal = s.eventCalendar || [];
+      const cal = (s.eventCalendar || []).filter(e => e.id !== 'playoffs');
       const done = cal.filter(e => e.status === 'complete').length;
-      $('season-next').textContent = `赛事阶段 ${done}/${cal.length || 7}`;
+      const next = cal.find(e => e.status === 'active' || e.status === 'pending');
+      $('season-next').textContent = s.phase === 'complete'
+        ? '全部赛事已结束 · 年度奖项评选'
+        : `赛事 ${done}/${cal.length}${next ? ' · 下场：' + next.label : ''}`;
       actions.innerHTML = `
         ${rankBtn}
         <button class="btn btn-primary" id="go-events">查看赛事日历</button>
@@ -1476,64 +1427,125 @@
     return html;
   }
 
+  function showAwardDetail(a) {
+    if (!a || !a.detail) return;
+    const d = a.detail;
+    let body = '';
+    if (d.type === 'event') {
+      const champ = d.champion ? C.teamMeta(d.champion) : null;
+      body += `<p><b>${esc(d.label)}</b></p>`;
+      if (champ) body += `<p>冠军：${esc(champ.nameCn || champ.name)}</p>`;
+      if (d.userPlaced) body += `<p>你的成绩：${esc(d.userPlaced)}</p>`;
+      if (d.mvp) {
+        const tm = C.teamMeta(d.mvp.team);
+        body += `<div class="award-detail-block"><b>MVP</b>：${d.mvp.isUser ? '⭐ ' : ''}${esc(d.mvp.name)} · ${esc(tm.nameCn || tm.name)} · Rtg ${d.mvp.rating || '—'}</div>`;
+      }
+      if (d.evps && d.evps.length) {
+        body += `<div class="award-detail-block"><b>EVP</b></div><ul class="award-detail-list">${d.evps.map(e => {
+          const tm = C.teamMeta(e.team);
+          return `<li>${e.isUser ? '⭐ ' : ''}${esc(e.name)} · ${esc(tm.nameCn || tm.name)} · ${e.role || ''} · Rtg ${e.rating || '—'}</li>`;
+        }).join('')}</ul>`;
+      }
+    } else if (d.type === 'top20') {
+      body += `<p class="sub">${esc(d.note || '')}</p>`;
+      body += `<div class="top20-list">${(d.list || []).map((p, i) =>
+        `<div class="top20-row ${p.isUser ? 'user' : ''}">
+          <span class="top20-rank">#${i + 1}</span>
+          <span class="top20-name">${p.isUser ? '⭐ ' : ''}${esc(p.name)}</span>
+          <span class="top20-team">${esc(C.teamMeta(p.team).nameCn || C.teamMeta(p.team).name)}</span>
+          <span class="top20-ovr">${p.rating || '—'}</span>
+        </div>`
+      ).join('')}</div>`;
+    } else if (d.type === 'team') {
+      const tm = C.teamMeta(d.team);
+      body += `<p><b>${esc(tm.nameCn || tm.name)}</b></p>`;
+      body += `<p>联赛 ${d.wins}-${d.losses} · 赛事冠军 ${d.evWins || 0} · VRS ${Math.round(d.vrs || 0)}</p>`;
+      if (d.topTeams && d.topTeams.length) {
+        body += `<div class="award-detail-block"><b>排名依据</b></div><ul class="award-detail-list">${d.topTeams.map((t, i) =>
+          `<li>#${i + 1} ${esc(t.name)} · 冠军 ${t.evWins || 0} · ${t.wins}-${t.losses}</li>`
+        ).join('')}</ul>`;
+      }
+    }
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `<div class="modal-content">
+      <div class="modal-header"><span class="help-title">${esc(a.label)}</span><button class="modal-close" type="button">✕</button></div>
+      <div class="award-detail-body">${body}</div>
+    </div>`;
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    overlay.querySelector('.modal-close').onclick = close;
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+  }
+
+  function bindAwardRows(root) {
+    if (!root) return;
+    Array.from(root.querySelectorAll('.award-row.clickable')).forEach(el => {
+      el.onclick = () => {
+        const idx = parseNum(el.dataset.idx, 0);
+        const awards = (PP.season && PP.season.awards) || [];
+        if (awards[idx]) showAwardDetail(awards[idx]);
+      };
+    });
+  }
+
   function renderPlayoffs() {
     const s = PP.season;
     const userTeam = PP.career.teamId;
-    initPlayoffView();
     if (!s.eventCalendar && (s.phase === 'events' || s.phase === 'playoffs' || s.phase === 'major')) {
       SIM.migrateSeasonEvents(s, userTeam);
     }
-    const cal = s.eventCalendar || [];
+    const cal = (s.eventCalendar || []).filter(ev => ev.id !== 'playoffs');
+    const done = cal.filter(e => e.status === 'complete').length;
     const active = SIM.getActiveEvent(s);
-    let html = '<div class="po-wrap">';
+    const nextEv = active || cal.find(e => e.status === 'pending');
+    const sub = $('events-sub');
+    if (sub) {
+      sub.textContent = s.phase === 'complete'
+        ? '全部赛事已结束'
+        : `进度 ${done}/${cal.length}${nextEv ? ' · 下一场：' + nextEv.label : ''}`;
+    }
 
-    html += `<div class="event-calendar">${cal.map(ev => {
-      const cls = ['event-cal-row', ev.status];
+    let html = '<div class="po-wrap po-wrap-compact">';
+    if (s.phase !== 'complete' && nextEv) {
+      html += `<div class="event-next-banner">
+        <span class="event-next-emoji">${nextEv.emoji || '🏅'}</span>
+        <div><div class="event-next-label">${active ? '进行中' : '下一场'}</div>
+        <div class="event-next-name">${esc(nextEv.label)}</div></div>
+      </div>`;
+    } else if (s.phase === 'complete') {
+      html += `<div class="event-next-banner event-next-final"><span class="event-next-emoji">🏆</span>
+        <div><div class="event-next-label">赛季结束</div><div class="event-next-name">年度奖项评选</div></div></div>`;
+    }
+
+    html += `<div class="event-track">${cal.map((ev, i) => {
+      const cls = ['event-track-item', ev.status];
       if (active && ev.id === active.id) cls.push('current');
-      const champ = ev.champion ? C.teamMeta(ev.champion) : null;
-      return `<div class="${cls.join(' ')}">
-        <span class="event-cal-emoji">${ev.emoji || '🏅'}</span>
-        <div class="event-cal-body">
-          <div class="event-cal-name">${esc(ev.label)}</div>
-          <div class="event-cal-meta">${ev.status === 'complete' ? (champ ? `冠军 ${esc(champ.nameCn || champ.name)}` : '已结束') : (ev.status === 'active' ? '进行中' : '待赛')}</div>
-        </div>
-        <span class="event-cal-status">${ev.status === 'complete' ? '✓' : (ev.status === 'active' ? '▶' : '○')}</span>
+      const short = ev.label.replace(/ESL Pro League/i, 'EPL').replace(/BLAST Premier/i, 'BLAST').replace(/IEM /, '');
+      return `<div class="${cls.join(' ')}" title="${esc(ev.label)}">
+        <span class="event-track-num">${i + 1}</span>
+        <span class="event-track-name">${esc(short)}</span>
+        <span class="event-track-dot">${ev.status === 'complete' ? '✓' : (ev.status === 'active' ? '▶' : '·')}</span>
       </div>`;
     }).join('')}</div>`;
 
-    if (active) {
-      html += `<div class="event-detail-panel"><h3 class="event-detail-title">${active.emoji || ''} ${esc(active.label)}</h3>`;
+    if (active && active.status === 'active') {
+      html += `<details class="event-detail-fold"><summary>查看 ${esc(active.label)} 详情</summary>`;
       html += renderEventDetail(active, userTeam);
-      html += '</div><div class="bv-po-actions">';
-      if (active.status === 'active') {
-        html += `<button class="btn btn-primary" id="sim-ev-step">▶ 模拟一步</button>`;
-        html += `<button class="btn btn-secondary" id="sim-ev-full">完成本赛事</button>`;
-      }
-      html += `<button class="btn btn-secondary" id="sim-ev-all">⏩ 快速模拟剩余</button></div>`;
-    } else if (s.phase === 'complete') {
-      html += `<div class="bv-po-actions"><button class="btn btn-primary" id="finish">🏆 年度奖项评选</button></div>`;
+      html += `</details>`;
     }
 
-    html += '</div>';
+    html += `<div class="bv-po-actions bv-po-actions-sticky">`;
+    if (s.phase === 'complete') {
+      html += `<button class="btn btn-primary" id="finish">🏆 年度奖项评选</button>`;
+    } else if (active && active.status === 'active') {
+      html += `<button class="btn btn-primary" id="sim-ev-step">▶ 模拟一步</button>`;
+      html += `<button class="btn btn-secondary" id="sim-ev-full">完成本场赛事</button>`;
+      html += `<button class="btn btn-secondary" id="sim-ev-all">⏩ 快速模拟剩余</button>`;
+    }
+    html += `</div></div>`;
+
     $('playoffs-content').innerHTML = html;
-
-    const poStats = $('po-my-stats');
-    if (poStats) {
-      poStats.innerHTML = '';
-      const ps = s.playerStats || {};
-      if (ps.maps) {
-        poStats.innerHTML = formatStatsBlock(ps, '赛季累计') +
-          (active && s.eventStats && s.eventStats[active.id] ? formatStatsBlock(s.eventStats[active.id], `本赛事 · ${active.label}`) : '');
-      }
-    }
-    const poLog = $('po-match-log');
-    if (poLog) {
-      const log = s.matchLog || [];
-      poLog.innerHTML = log.slice(0, 5).map(m =>
-        `<div class="match-log-row ${m.win ? 'win' : 'loss'}"><div class="ml-main">${esc(m.label)} ${esc(m.map)} ${m.win ? '胜' : '负'}</div><div class="ml-stat">${m.kills}/${m.deaths}/${m.assists} · Rtg ${m.rating}</div></div>`
-      ).join('') || '<div class="sub">暂无你的出场记录</div>';
-    }
-
     const step = $('sim-ev-step'); if (step) step.onclick = simEventStepUI;
     const full = $('sim-ev-full'); if (full) full.onclick = simCurrentEventComplete;
     const all = $('sim-ev-all'); if (all) all.onclick = simAllEventsUI;
@@ -1543,17 +1555,18 @@
   function renderAwardRow(a, idx) {
     const emoji = a.emoji || '🏅';
     const rankCls = a.rankClass || 'dim';
+    const clickCls = a.clickable ? ' clickable' : '';
     let winnerHtml = '';
     if (a.isList && a.listMeta) {
       if (a.isRankedList) {
-        winnerHtml = `<div class="top20-list">${a.listMeta.map(p =>
+        winnerHtml = `<div class="top20-list">${a.listMeta.slice(0, 5).map(p =>
           `<div class="top20-row ${p.isUser ? 'user' : ''}">
             <span class="top20-rank">#${p.rank}</span>
             <span class="top20-name">${p.isUser ? '⭐ ' : ''}${esc(p.name)}</span>
             <span class="top20-team">${esc(p.teamName || p.team || '')}</span>
-            <span class="top20-ovr">${p.ovr || '—'}</span>
+            <span class="top20-ovr">${p.rating || p.ovr || '—'}</span>
           </div>`
-        ).join('')}</div>`;
+        ).join('')}${a.listMeta.length > 5 ? '<div class="sub" style="margin-top:4px">点击查看完整 Top 20 →</div>' : ''}</div>`;
       } else {
         winnerHtml = `<div class="award-list-names">${a.listMeta.map(p =>
           `<span class="award-list-chip ${p.isUser ? 'user' : ''}">${p.isUser ? '⭐ ' : ''}${esc(p.name)}</span>`
@@ -1564,9 +1577,9 @@
       winnerHtml = `<div class="award-winner ${a.isUser ? 'user' : ''}">${a.isUser ? '⭐ ' : ''}${esc(a.winner || '')}</div>` +
         (teamMeta ? `<div class="award-team">${esc(teamMeta.nameCn || teamMeta.name)}</div>` : '');
     }
-    return `<div class="award-row ${a.isUser ? 'user-win' : ''}" style="animation-delay:${idx * 0.35}s">
+    return `<div class="award-row ${a.isUser ? 'user-win' : ''}${clickCls}" data-idx="${idx}" style="animation-delay:${idx * 0.35}s">
       <div class="award-icon">${emoji}</div>
-      <div class="award-body"><div class="award-cat">${esc(a.label)}</div>${winnerHtml}</div>
+      <div class="award-body"><div class="award-cat">${esc(a.label)}</div>${winnerHtml}${a.clickable ? '<div class="sub" style="margin-top:4px">点击查看详情 →</div>' : ''}</div>
       <div class="award-rank ${rankCls}">${esc(a.userRank || '—')}</div>
     </div>`;
   }
@@ -1592,6 +1605,7 @@
     setTimeout(() => {
       const awards = s.awards || [];
       $('awards-content').innerHTML = `<div class="awards-wrap">${awards.map((a, i) => renderAwardRow(a, i)).join('')}</div>`;
+      bindAwardRows($('awards-content'));
       $('awards-footer').innerHTML = `<div class="awards-footer-actions">
         <button class="btn btn-primary" id="awards-to-results">📊 查看赛季总结</button>
       </div>`;
@@ -1605,8 +1619,8 @@
     const html = `<div class="awards-wrap">${awards.map((a, i) => renderAwardRow(a, i)).join('')}</div>`;
     const el = $('awards-content');
     const el2 = $('awards-list-results');
-    if (el) el.innerHTML = html;
-    if (el2) el2.innerHTML = html;
+    if (el) { el.innerHTML = html; bindAwardRows(el); }
+    if (el2) { el2.innerHTML = html; bindAwardRows(el2); }
   }
 
   function renderResults() {
@@ -1621,14 +1635,35 @@
       <h2>${parseNum(s.year, c.currentYear)} 赛季总结</h2>
       <p>${C.teamLogoHtml(meta, 28)} ${esc(c.playerName)} · ${c.role} · ${esc(meta.nameCn || meta.name)} · 年龄 ${c.age}</p>
       <p>联赛 ${s.wins}-${s.losses} · Rating ${s.playerStats.rating} · K/D/A ${s.playerStats.kills}/${s.playerStats.deaths}/${s.playerStats.assists}</p>
-      ${(s.eventCalendar || []).filter(e => e.status === 'complete').length ? `<div class="similar-title">本年度赛事</div>
-        ${(s.eventCalendar || []).filter(e => e.status === 'complete').map(ev => {
+      ${(s.eventCalendar || []).filter(e => e.status === 'complete' && e.id !== 'playoffs').length ? `<div class="similar-title">本年度赛事</div>
+        ${(s.eventCalendar || []).filter(e => e.status === 'complete' && e.id !== 'playoffs').map(ev => {
           const cm = ev.champion ? C.teamMeta(ev.champion) : null;
-          return `<div class="similar-row"><span>${esc(ev.label)}</span><span>${cm ? esc(cm.nameCn || cm.name) : '—'}</span></div>`;
+          const mvp = ev.mvp ? ` · MVP ${ev.mvp.name}` : '';
+          return `<div class="similar-row event-result-row" data-event-id="${esc(ev.id)}" style="cursor:pointer">
+            <span>${esc(ev.label)}</span><span>${cm ? esc(cm.nameCn || cm.name) : '—'}${esc(mvp)}</span></div>`;
         }).join('')}` : ''}
       <p>已征战 ${c.seasonCount} 赛季</p>
       ${hist ? `<div class="similar-title">近季战绩</div>${hist}` : ''}`;
     renderAwards();
+    Array.from(document.querySelectorAll('.event-result-row')).forEach(el => {
+      el.onclick = () => {
+        const ev = (s.eventCalendar || []).find(e => e.id === el.dataset.eventId);
+        if (!ev) return;
+        showAwardDetail({
+          label: ev.label,
+          clickable: true,
+          detail: {
+            type: 'event',
+            eventId: ev.id,
+            label: ev.label,
+            champion: ev.champion,
+            mvp: ev.mvp || null,
+            evps: ev.evps || [],
+            userPlaced: ev.userPlaced
+          }
+        });
+      };
+    });
     const btn = $('btn-next-season');
     if (btn) {
       const nextAge = parseNum(c.age, 20) + 1;

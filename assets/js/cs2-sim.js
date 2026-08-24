@@ -150,7 +150,6 @@
   }
 
   const EVENT_TEMPLATES = [
-    { id: 'playoffs', label: '联赛季后赛', emoji: '🏆', type: 'playoffs', teams: 8 },
     { id: 'iem_kato', label: 'IEM Katowice', emoji: '🌍', type: 'swiss', teams: 16 },
     { id: 'blast_spring', label: 'BLAST Premier Spring', emoji: '💥', type: 'elim8', teams: 8 },
     { id: 'epl', label: 'ESL Pro League S49', emoji: '📡', type: 'swiss', teams: 16 },
@@ -238,18 +237,14 @@
     const ev = season.eventCalendar && season.eventCalendar[season.currentEventIdx];
     if (!ev || ev.state) return ev;
     const standings = season.standings || {};
-    if (ev.type === 'playoffs') {
-      ev.state = initPlayoffs(standings);
-      season.playoffState = ev.state;
-    } else if (ev.type === 'swiss') {
+    if (ev.type === 'swiss') {
       const teams = inviteTeams(standings, ev.teams, userTeam, ev.id);
       ev.state = initSwissEvent(teams, userTeam);
     } else if (ev.type === 'elim8') {
       const teams = inviteTeams(standings, ev.teams, userTeam, ev.id);
       ev.state = initElim8(teams, userTeam);
     } else if (ev.type === 'major') {
-      const po = season.eventCalendar.find(e => e.id === 'playoffs');
-      ev.state = initMajor(standings, po && po.state, userTeam);
+      ev.state = initMajor(standings, userTeam);
       season.majorState = ev.state;
     }
     ev.status = 'active';
@@ -283,21 +278,84 @@
     return { season, eventId: ev.id, label: ev.label, kFactor: k };
   }
 
-  function finalizeEvent(ev, userTeam, season) {
+  function eventParticipants(ev) {
+    const st = ev.state;
+    if (!st) return [];
+    if (st.teams && st.teams.length) return st.teams.slice();
+    if (st.swiss && st.swiss.length) return st.swiss.map(t => t.team);
+    const set = new Set();
+    (st.results || []).concat(st.bracket || []).forEach(m => {
+      if (m.teamA) set.add(m.teamA);
+      if (m.teamB) set.add(m.teamB);
+    });
+    return Array.from(set);
+  }
+
+  function computeEventHonors(ev, season, career) {
+    const teams = eventParticipants(ev);
+    if (!teams.length) return;
+    const candidates = [];
+    const userTeam = career && career.teamId;
+    teams.forEach(tid => {
+      ((C.LEAGUE.teams[tid] && C.LEAGUE.teams[tid].players) || []).slice(0, 6).forEach(p => {
+        candidates.push({
+          key: `${tid}:${p.name}`,
+          name: p.name,
+          team: tid,
+          role: p.role,
+          rating: parseFloat(p.rating) || 1.0,
+          ovr: parseInt(p.ovr, 10) || 75,
+          isUser: false
+        });
+      });
+    });
+    if (userTeam && teams.includes(userTeam) && career) {
+      const ps = season.playerStats || {};
+      candidates.push({
+        key: `__USER__`,
+        name: career.playerName,
+        team: userTeam,
+        role: career.role,
+        rating: parseFloat(ps.rating) || 1.0,
+        ovr: parseInt(career.ovr, 10) || 75,
+        isUser: true
+      });
+    }
+    const champBonus = (t) => (ev.champion && t === ev.champion ? 12 : 0);
+    const scored = candidates.map(c => ({
+      ...c,
+      score: c.rating * 52 + c.ovr * 0.28 + champBonus(c.team) + (c.isUser ? 4 : 0)
+    })).sort((a, b) => b.score - a.score);
+    const uniq = [];
+    const seen = new Set();
+    scored.forEach(c => {
+      if (seen.has(c.key)) return;
+      seen.add(c.key);
+      uniq.push(c);
+    });
+    if (!uniq.length) return;
+    ev.mvp = { name: uniq[0].name, team: uniq[0].team, role: uniq[0].role, rating: uniq[0].rating, isUser: uniq[0].isUser };
+    ev.evps = uniq.slice(1, 5).map(c => ({
+      name: c.name, team: c.team, role: c.role, rating: c.rating, isUser: c.isUser
+    }));
+  }
+
+  function finalizeEvent(ev, userTeam, season, career) {
     const st = ev.state;
     if (!st) return;
     ev.champion = st.champion || null;
     ev.userPlaced = userEventPlacement(ev, userTeam);
     ev.status = 'complete';
+    computeEventHonors(ev, season, career);
     const R = window.CS2_RANKINGS;
     if (R && season && season.vrs && ev.champion) {
       R.applyEventPlacement(season, ev.champion, 'champion', ev.id);
     }
   }
 
-  function advanceToNextEvent(season, userTeam) {
+  function advanceToNextEvent(season, userTeam, career) {
     const cur = getActiveEvent(season);
-    if (cur && cur.status !== 'complete') finalizeEvent(cur, userTeam, season);
+    if (cur && cur.status !== 'complete') finalizeEvent(cur, userTeam, season, career);
     season.currentEventIdx++;
     if (season.currentEventIdx >= (season.eventCalendar || []).length) {
       season.phase = 'complete';
@@ -317,33 +375,33 @@
     const st = ev.state;
     const ctx = eventCtx(season, ev);
     if (ev.type === 'playoffs') {
-      if (st.complete) { finalizeEvent(ev, userTeam, season); return { done: true, message: `${ev.label} 已结束` }; }
+      if (st.complete) { finalizeEvent(ev, userTeam, season, career); return { done: true, message: `${ev.label} 已结束` }; }
       advancePlayoffBracket(st, userTeam, career, ctx);
-      if (st.complete) finalizeEvent(ev, userTeam, season);
+      if (st.complete) finalizeEvent(ev, userTeam, season, career);
       return { done: st.complete, message: st.complete ? `${ev.label} 冠军：${st.champion}` : `模拟 ${st.round}` };
     }
     if (ev.type === 'swiss') {
-      if (st.complete) { finalizeEvent(ev, userTeam, season); return { done: true, message: `${ev.label} 已结束` }; }
+      if (st.complete) { finalizeEvent(ev, userTeam, season, career); return { done: true, message: `${ev.label} 已结束` }; }
       if (st.phase === 'swiss') {
         simSwissDay(st, userTeam, career, ctx);
         if (st.phase !== 'swiss') st.round = 'QF';
       } else {
         advanceMajorBracket(st, userTeam, career, ctx);
       }
-      if (st.complete) finalizeEvent(ev, userTeam, season);
+      if (st.complete) finalizeEvent(ev, userTeam, season, career);
       return { done: st.complete, message: st.complete ? `${ev.label} 冠军：${st.champion}` : (st.phase === 'swiss' ? 'Swiss 一轮' : `模拟 ${st.round}`) };
     }
     if (ev.type === 'elim8') {
-      if (st.complete) { finalizeEvent(ev, userTeam, season); return { done: true, message: `${ev.label} 已结束` }; }
+      if (st.complete) { finalizeEvent(ev, userTeam, season, career); return { done: true, message: `${ev.label} 已结束` }; }
       advanceElimBracket(st, userTeam, career, ctx);
-      if (st.complete) finalizeEvent(ev, userTeam, season);
+      if (st.complete) finalizeEvent(ev, userTeam, season, career);
       return { done: st.complete, message: st.complete ? `${ev.label} 冠军：${st.champion}` : `模拟 ${st.round}` };
     }
     if (ev.type === 'major') {
-      if (st.complete) { finalizeEvent(ev, userTeam, season); return { done: true, message: `${ev.label} 已结束` }; }
+      if (st.complete) { finalizeEvent(ev, userTeam, season, career); return { done: true, message: `${ev.label} 已结束` }; }
       if (st.phase === 'major') simSwissDay(st, userTeam, career, ctx);
       else advanceMajorBracket(st, userTeam, career, ctx);
-      if (st.complete) finalizeEvent(ev, userTeam, season);
+      if (st.complete) finalizeEvent(ev, userTeam, season, career);
       return { done: st.complete, message: st.complete ? `${ev.label} 冠军：${st.champion}` : (st.phase === 'major' ? 'Major Swiss 一轮' : `Major ${st.round}`) };
     }
     return { done: false, message: '未知赛事' };
@@ -353,16 +411,13 @@
     let guard = 0;
     while (guard++ < 80 && season.phase === 'events') {
       const ev = getActiveEvent(season);
-      if (!ev) break;
-      if (ev.status === 'complete') {
-        advanceToNextEvent(season, userTeam);
-        if (season.phase === 'complete') break;
-        continue;
-      }
+      if (!ev || ev.status === 'complete') break;
       simEventStep(season, userTeam, career);
-      if (ev.status === 'complete') {
-        advanceToNextEvent(season, userTeam);
-      }
+      if (ev.status === 'complete') break;
+    }
+    const doneEv = getActiveEvent(season);
+    if (doneEv && doneEv.status === 'complete') {
+      advanceToNextEvent(season, userTeam, career);
     }
     return season.phase === 'complete';
   }
@@ -372,8 +427,7 @@
       simEventComplete(season, userTeam, career);
       if (season.phase === 'complete') break;
       const ev = getActiveEvent(season);
-      if (!ev) break;
-      if (ev.status !== 'complete') break;
+      if (!ev || ev.status !== 'active') break;
     }
     return season.phase === 'complete';
   }
@@ -384,7 +438,10 @@
   }
 
   function migrateSeasonEvents(season, userTeam) {
-    if (season.eventCalendar) return season;
+    if (season.eventCalendar) {
+      season.eventCalendar = season.eventCalendar.filter(ev => ev.id !== 'playoffs');
+      return season;
+    }
     if (season.phase === 'league' || !season.phase) return season;
     season.eventCalendar = EVENT_TEMPLATES.map((tpl, idx) => ({
       ...tpl, status: 'pending', state: null, champion: null, userPlaced: null
@@ -560,16 +617,8 @@
     }
   }
 
-  function initMajor(standings, playoffState, userTeam) {
-    const top6 = sortedStandings(standings).slice(0, 6).map(r => r.team);
-    const poWinners = (playoffState && playoffState.results || [])
-      .filter(r => r.round === 'F').map(r => r.winner);
-    const invited = unique([...top6, ...(poWinners || [])]).slice(0, 16);
-    while (invited.length < 16) {
-      const rest = C.LEAGUE.teamList.filter(t => !invited.includes(t));
-      if (!rest.length) break;
-      invited.push(rest[0]);
-    }
+  function initMajor(standings, userTeam) {
+    const invited = inviteTeams(standings, 16, userTeam, 'major');
     return {
       phase: 'major', teams: invited,
       swiss: invited.map(t => ({ team: t, wins: 0, losses: 0, eliminated: false, qualified: false })),

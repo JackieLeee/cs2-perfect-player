@@ -13,7 +13,7 @@
     { id: 'all_roles', name: '全角色', desc: '五个角色各建号一次（累计）', icon: '🎭', rarity: 'rare' },
     { id: 'legend_attr', name: '传奇属性', desc: '从传奇惊喜卡锁定属性', icon: '⭐', rarity: 'rare' },
     { id: 'clean_season', name: '零负面', desc: '单赛季无负面事件选择', icon: '😇', rarity: 'rare' },
-    { id: 'playoffs_run', name: '季后赛', desc: '进入联赛季后赛', icon: '🎪', rarity: 'common' },
+    { id: 'playoffs_run', name: '年度赛事', desc: '进入年度赛事阶段', icon: '🎪', rarity: 'common' },
     { id: 'major_appear', name: 'Major 亮相', desc: '进入 Major 正赛', icon: '🌍', rarity: 'epic' },
     { id: 'top_awp', name: '最佳狙击', desc: '获得 Best AWPer', icon: '🔭', rarity: 'epic' },
     { id: 'top_igl', name: '最佳指挥', desc: '获得 Best IGL', icon: '🧠', rarity: 'epic' },

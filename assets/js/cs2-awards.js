@@ -44,7 +44,7 @@
     });
 
     Object.keys(C.LEAGUE.teams || {}).forEach(tid => {
-      (C.LEAGUE.teams[tid].players || []).slice(0, 5).forEach(p => {
+      (C.LEAGUE.teams[tid].players || []).slice(0, 6).forEach(p => {
         const rec = teamRecord(tid, standings);
         candidates.push({
           key: `${tid}:${p.name}`,
@@ -84,7 +84,7 @@
     const seasonKey = `${state.season && state.season.year || 2026}|${state.career && state.career.playerName || ''}`;
     return candidates.map(c => ({
       ...c,
-      score: scorer(c) + hash01(seasonKey + c.key) * 6
+      score: scorer(c) + hash01(seasonKey + c.key) * 4
     })).sort((a, b) => b.score - a.score);
   }
 
@@ -93,10 +93,18 @@
     return idx >= 0 ? idx + 1 : 99;
   }
 
+  function teamEventWins(state, teamId) {
+    return (state.season.eventCalendar || []).filter(ev =>
+      ev.status === 'complete' && ev.champion === teamId
+    ).length;
+  }
+
   function teamCandidates(state) {
     const standings = state.season.standings || {};
+    const vrs = state.season.vrs || {};
     return Object.keys(standings).map(tid => {
       const rec = teamRecord(tid, standings);
+      const evWins = teamEventWins(state, tid);
       return {
         team: tid,
         name: (C.teamMeta(tid).nameCn || C.teamMeta(tid).name),
@@ -104,9 +112,12 @@
         losses: rec.losses,
         winPct: winPct(rec),
         roundDiff: n(standings[tid].roundDiff, 0),
-        isUser: tid === state.career.teamId
+        evWins,
+        vrs: n(vrs[tid], 0),
+        isUser: tid === state.career.teamId,
+        score: evWins * 48 + rec.wins * 3 + winPct(rec) * 22 + n(vrs[tid], 0) * 0.015 + n(standings[tid].roundDiff, 0) * 0.08
       };
-    }).sort((a, b) => b.wins - a.wins || b.roundDiff - a.roundDiff);
+    }).sort((a, b) => b.score - a.score || b.evWins - a.evWins || b.wins - a.wins);
   }
 
   function eventBonus(state, teamId) {
@@ -115,10 +126,29 @@
     cal.forEach(ev => {
       if (ev.status !== 'complete' || ev.champion !== teamId) return;
       if (ev.id === 'major') bonus += 35;
-      else if (ev.id === 'playoffs') bonus += 12;
-      else bonus += 8;
+      else bonus += 10;
     });
     return bonus;
+  }
+
+  function playerEventHonors(state, key) {
+    let mvp = 0;
+    let evp = 0;
+    (state.season.eventCalendar || []).forEach(ev => {
+      if (ev.status !== 'complete') return;
+      if (ev.mvp && (ev.mvp.isUser ? key === '__USER__' : `${ev.mvp.team}:${ev.mvp.name}` === key)) mvp++;
+      if ((ev.evps || []).some(e => e.isUser ? key === '__USER__' : `${e.team}:${e.name}` === key)) evp++;
+    });
+    return { mvp, evp, total: mvp * 3 + evp };
+  }
+
+  function top20Eligible(c, state) {
+    const rec = teamRecord(c.team, state.season.standings || {});
+    const honors = playerEventHonors(state, c.key);
+    const teamOk = rec.wins >= 6 || teamEventWins(state, c.team) >= 1 || winPct(rec) >= 0.42;
+    const personalOk = c.rating >= 1.0 || (c.isUser && n(state.season.playerStats && state.season.playerStats.rating, 0) >= 0.95);
+    const awardOk = honors.total >= 1;
+    return teamOk && personalOk && awardOk;
   }
 
   function computeTop20(state) {
@@ -127,18 +157,120 @@
     const seasonKey = `${season.year || 2026}|${state.career.playerName || ''}`;
     const candidates = buildCandidates(state).map(c => {
       const rec = teamRecord(c.team, standings);
-      const evBonus = eventBonus(state, c.team) * 0.15;
-      const score = c.ovr * 0.42 + c.rating * 38 + winPct(rec) * 22 + c.wins * 1.2 + evBonus +
-        hash01(seasonKey + c.key + 'top20') * 4;
-      return { ...c, score };
-    }).sort((a, b) => b.score - a.score);
+      const honors = playerEventHonors(state, c.key);
+      const teamScore = rec.wins * 2.2 + winPct(rec) * 18 + eventBonus(state, c.team) * 0.2;
+      const personalScore = c.rating * 38 + c.ovr * 0.32;
+      const awardScore = honors.mvp * 14 + honors.evp * 5;
+      const score = teamScore * 0.34 + personalScore * 0.38 + awardScore * 0.28 +
+        hash01(seasonKey + c.key + 'top20') * 3;
+      return {
+        ...c,
+        score,
+        teamScore,
+        personalScore,
+        awardScore,
+        honors,
+        eligible: top20Eligible(c, state)
+      };
+    }).filter(c => c.eligible).sort((a, b) => b.score - a.score);
 
     const top20 = candidates.slice(0, 20);
     const userIdx = top20.findIndex(c => c.isUser);
+    const userInAll = buildCandidates(state).find(c => c.isUser);
+    let userRankVal = userIdx >= 0 ? userIdx + 1 : userRank(candidates, '__USER__');
+    if (userInAll && !top20Eligible(userInAll, state)) userRankVal = 99;
     return {
       list: top20,
-      userRank: userIdx >= 0 ? userIdx + 1 : userRank(candidates, '__USER__')
+      userRank: userRankVal,
+      userEligible: userInAll ? top20Eligible(userInAll, state) : false
     };
+  }
+
+  function buildEventAwardRows(state) {
+    const rows = [];
+    (state.season.eventCalendar || []).forEach(ev => {
+      if (ev.status !== 'complete' || !ev.champion) return;
+      const champMeta = C.teamMeta(ev.champion);
+      rows.push({
+        id: `event_${ev.id}_champ`,
+        act: ev.id,
+        eventId: ev.id,
+        label: `${ev.label} · 冠军`,
+        emoji: ev.emoji || '🏅',
+        winner: champMeta.nameCn || champMeta.name,
+        team: ev.champion,
+        isUser: ev.champion === state.career.teamId,
+        userRank: ev.champion === state.career.teamId ? '🥇 冠军' : '—',
+        rankClass: ev.champion === state.career.teamId ? 'gold' : 'dim',
+        isTeamAward: true,
+        clickable: true,
+        detail: {
+          type: 'event',
+          eventId: ev.id,
+          label: ev.label,
+          champion: ev.champion,
+          mvp: ev.mvp || null,
+          evps: ev.evps || [],
+          userPlaced: ev.userPlaced
+        }
+      });
+      if (ev.mvp) {
+        rows.push({
+          id: `event_${ev.id}_mvp`,
+          act: `${ev.id}_mvp`,
+          eventId: ev.id,
+          label: `${ev.label} · MVP`,
+          emoji: '💎',
+          winner: ev.mvp.name,
+          team: ev.mvp.team,
+          isUser: !!ev.mvp.isUser,
+          userRank: ev.mvp.isUser ? '🥇 MVP' : '—',
+          rankClass: ev.mvp.isUser ? 'gold' : 'dim',
+          clickable: true,
+          detail: {
+            type: 'event',
+            eventId: ev.id,
+            label: ev.label,
+            champion: ev.champion,
+            mvp: ev.mvp,
+            evps: ev.evps || [],
+            userPlaced: ev.userPlaced
+          }
+        });
+      }
+      if (ev.evps && ev.evps.length) {
+        rows.push({
+          id: `event_${ev.id}_evp`,
+          act: `${ev.id}_evp`,
+          eventId: ev.id,
+          label: `${ev.label} · EVP`,
+          emoji: '🌟',
+          isList: true,
+          isUser: ev.evps.some(e => e.isUser),
+          userRank: ev.evps.some(e => e.isUser) ? '入选 EVP' : '—',
+          rankClass: ev.evps.some(e => e.isUser) ? 'orange' : 'dim',
+          listMeta: ev.evps.map(e => ({
+            name: e.name,
+            team: e.team,
+            teamName: C.teamMeta(e.team).nameCn || C.teamMeta(e.team).name,
+            role: e.role,
+            rating: e.rating,
+            isUser: e.isUser
+          })),
+          clickable: true,
+          detail: {
+            type: 'event',
+            eventId: ev.id,
+            label: ev.label,
+            champion: ev.champion,
+            mvp: ev.mvp || null,
+            evps: ev.evps || [],
+            userPlaced: ev.userPlaced
+          }
+        });
+      }
+    });
+    return rows;
   }
 
   function computeSeasonAwards(state) {
@@ -151,27 +283,41 @@
       id: 'top20', act: 'top20', label: '年度 Top 20 选手', emoji: '📋',
       isList: true, isRankedList: true,
       isUser: top20Data.list.some(c => c.isUser),
-      userRank: rankLabel(top20Data.userRank),
+      userRank: top20Data.userEligible ? rankLabel(top20Data.userRank) : '未达三要素',
       rankClass: rankClass(top20Data.userRank),
+      clickable: true,
+      detail: {
+        type: 'top20',
+        note: '需同时满足：队伍成绩 · 个人表现 · 赛事荣誉（MVP/EVP）',
+        list: top20Data.list
+      },
       listMeta: top20Data.list.map((c, i) => ({
         rank: i + 1,
         name: c.name,
         team: c.team,
         teamName: (C.teamMeta(c.team).nameCn || C.teamMeta(c.team).name),
         ovr: c.ovr,
+        rating: c.rating,
         isUser: c.isUser
       }))
     });
 
-    const mvpSorted = ballotScore(state, candidates, c => c.rating * 45 + c.wins * 2 + winPct(teamRecord(c.team, state.season.standings)) * 30);
+    const mvpSorted = ballotScore(state, candidates.filter(c => playerEventHonors(state, c.key).total >= 1), c =>
+      c.rating * 40 + c.wins * 2 + winPct(teamRecord(c.team, state.season.standings)) * 28 +
+      playerEventHonors(state, c.key).total * 6
+    );
     const mvp = mvpSorted[0];
-    awards.push({
-      id: 'season_mvp', act: 'mvp', label: '年度 MVP', emoji: '🏆',
-      winner: mvp.name, team: mvp.team, isUser: mvp.isUser,
-      userRank: rankLabel(userRank(mvpSorted, userKey)), rankClass: rankClass(userRank(mvpSorted, userKey))
-    });
+    if (mvp) {
+      awards.push({
+        id: 'season_mvp', act: 'mvp', label: '年度 MVP', emoji: '🏆',
+        winner: mvp.name, team: mvp.team, isUser: mvp.isUser,
+        userRank: rankLabel(userRank(mvpSorted, userKey)), rankClass: rankClass(userRank(mvpSorted, userKey))
+      });
+    }
 
-    const awpSorted = ballotScore(state, candidates.filter(c => c.role === 'AWP'), c => c.rating * 55 + c.adr * 0.2);
+    const awpSorted = ballotScore(state, candidates.filter(c => c.role === 'AWP' && playerEventHonors(state, c.key).total >= 1), c =>
+      c.rating * 55 + c.adr * 0.2 + playerEventHonors(state, c.key).total * 4
+    );
     if (awpSorted.length) {
       const awp = awpSorted[0];
       awards.push({
@@ -182,7 +328,9 @@
     }
 
     const iglSorted = ballotScore(state, candidates.filter(c => c.role === 'IGL'), c =>
-      winPct(teamRecord(c.team, state.season.standings)) * 50 + c.rating * 25 + c.wins * 2);
+      winPct(teamRecord(c.team, state.season.standings)) * 50 + c.rating * 25 + c.wins * 2 +
+      teamEventWins(state, c.team) * 8
+    );
     if (iglSorted.length) {
       const igl = iglSorted[0];
       awards.push({
@@ -192,35 +340,6 @@
       });
     }
 
-    const entrySorted = ballotScore(state, candidates.filter(c => c.role === 'Entry'), c => c.rating * 40 + c.adr * 0.25);
-    if (entrySorted.length) {
-      const entry = entrySorted[0];
-      awards.push({
-        id: 'best_entry', act: 'entry', label: 'Best Entry', emoji: '⚡',
-        winner: entry.name, team: entry.team, isUser: entry.isUser,
-        userRank: rankLabel(userRank(entrySorted, userKey)), rankClass: rankClass(userRank(entrySorted, userKey))
-      });
-    }
-
-    const risingSorted = ballotScore(state, candidates, c => c.rating * 35 + (c.isUser ? 10 : 0));
-    const rising = risingSorted.find(c => c.rating >= 1.0) || risingSorted[0];
-    if (rising) {
-      awards.push({
-        id: 'rising_star', act: 'rising', label: 'Rising Star', emoji: '🌟',
-        winner: rising.name, team: rising.team, isUser: rising.isUser,
-        userRank: rankLabel(userRank(risingSorted, userKey)), rankClass: rankClass(userRank(risingSorted, userKey))
-      });
-    }
-
-    const allStar = mvpSorted.slice(0, 5);
-    awards.push({
-      id: 'allstar_first', act: 'allstar', label: 'All-Star First Team', emoji: '⭐',
-      winners: allStar.map(c => c.name), isList: true, isUser: allStar.some(c => c.isUser),
-      userRank: allStar.some(c => c.isUser) ? rankLabel(allStar.findIndex(c => c.isUser) + 1) : '未入选',
-      rankClass: allStar.some(c => c.isUser) ? rankClass(allStar.findIndex(c => c.isUser) + 1) : 'dim',
-      listMeta: allStar.map(c => ({ name: c.name, isUser: c.isUser }))
-    });
-
     const teams = teamCandidates(state);
     const teamOfYear = teams[0];
     if (teamOfYear) {
@@ -229,36 +348,21 @@
         winner: teamOfYear.name, team: teamOfYear.team, isUser: teamOfYear.isUser,
         userRank: teamOfYear.isUser ? '🥇 第一名' : rankLabel(teams.findIndex(t => t.isUser) + 1),
         rankClass: teamOfYear.isUser ? 'gold' : rankClass(teams.findIndex(t => t.isUser) + 1),
-        isTeamAward: true
+        isTeamAward: true,
+        clickable: true,
+        detail: {
+          type: 'team',
+          team: teamOfYear.team,
+          wins: teamOfYear.wins,
+          losses: teamOfYear.losses,
+          evWins: teamOfYear.evWins,
+          vrs: teamOfYear.vrs,
+          topTeams: teams.slice(0, 5)
+        }
       });
     }
 
-    (state.season.eventCalendar || []).forEach(ev => {
-      if (ev.status !== 'complete' || !ev.champion) return;
-      const champMeta = C.teamMeta(ev.champion);
-      awards.push({
-        id: `event_${ev.id}`, act: ev.id, label: `${ev.label} 冠军`, emoji: ev.emoji || '🏅',
-        winner: champMeta.nameCn || champMeta.name, team: ev.champion,
-        isUser: ev.champion === state.career.teamId,
-        userRank: ev.champion === state.career.teamId ? '🥇 冠军' : '—',
-        rankClass: ev.champion === state.career.teamId ? 'gold' : 'dim',
-        isTeamAward: true
-      });
-    });
-
-    const majorEv = (state.season.eventCalendar || []).find(e => e.id === 'major');
-    if (majorEv && majorEv.status === 'complete') {
-      const mvpSortedMajor = ballotScore(state, candidates, c => c.rating * 50 + (c.isUser ? 12 : 0));
-      const majorMvp = mvpSortedMajor[0];
-      if (majorMvp) {
-        awards.push({
-          id: 'major_mvp', act: 'major_mvp', label: 'Major MVP', emoji: '💎',
-          winner: majorMvp.name, team: majorMvp.team, isUser: majorMvp.isUser,
-          userRank: majorMvp.isUser ? '🥇 MVP' : rankLabel(userRank(mvpSortedMajor, userKey)),
-          rankClass: majorMvp.isUser ? 'gold' : rankClass(userRank(mvpSortedMajor, userKey))
-        });
-      }
-    }
+    awards.push(...buildEventAwardRows(state));
 
     return awards;
   }
@@ -268,6 +372,8 @@
     computeTop20,
     buildCandidates,
     rankLabel,
-    rankClass
+    rankClass,
+    teamCandidates,
+    playerEventHonors
   };
 })();

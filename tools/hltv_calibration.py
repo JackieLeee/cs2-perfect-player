@@ -27,8 +27,8 @@ def team_median_from_candidates(candidates: list[dict[str, Any]], stats_by_pid: 
 
 
 def anchor_ovr(hltv_rating: float) -> int:
-    """Map HLTV Rating 2.0 to game OVR (avg pro ~1.05 → ~79, elite ~1.35 → ~87)."""
-    return clamp(int(round(52 + float(hltv_rating) * 26)))
+    """Map HLTV Rating 2.0 to game OVR (avg pro ~1.05 → ~81, elite ~1.25 → ~87)."""
+    return clamp(int(round(53 + float(hltv_rating) * 27)))
 
 
 def shrink_rating(raw: float, maps: int, fallback: float) -> float:
@@ -154,7 +154,7 @@ def calibration_rules_note() -> dict[str, Any]:
     return {
         "version": 5,
         "method": "HLTV Rating 2.0 + sample shrinkage + tightened OVR anchor",
-        "ovrFormula": f"OVR ≈ clamp(52 + effectiveRating × 26); maps<{MIN_MAPS_TRUST} regresses to team median",
+        "ovrFormula": f"OVR ≈ clamp(53 + effectiveRating × 27); maps<{MIN_MAPS_TRUST} regresses to team median",
         "ratingFormula": "HLTV Rating 2.0 (Big Events match aggregation)",
         "statsWindow": "12 months",
         "provider": "hltv.org",

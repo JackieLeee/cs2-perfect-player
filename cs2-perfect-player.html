@@ -96,17 +96,14 @@
   </div>
 
   <div id="screen-playoffs" class="screen">
-    <div class="section-title"><h1>年度赛事</h1><div class="sub">季后赛 · IEM · BLAST · EPL · Major</div></div>
-    <div class="my-stats-panel" id="po-my-stats"></div>
-    <div class="match-log-title">我的最近比赛</div>
-    <div class="match-log-panel" id="po-match-log"></div>
+    <div class="section-title"><h1>年度赛事</h1><div class="sub" id="events-sub">赛程进度</div></div>
     <div id="playoffs-content"></div>
     <button class="btn btn-secondary" id="btn-rankings-po" style="margin-top:8px">📊 排行榜</button>
     <button class="btn btn-secondary" id="btn-menu-po" style="margin-top:12px">返回主菜单</button>
   </div>
 
   <div id="screen-rankings" class="screen">
-    <div class="section-title"><h1>排行榜</h1><div class="sub">战队 VRS · 选手综合排名</div></div>
+    <div class="section-title"><h1>排行榜</h1><div class="sub">VRS · Rating · OVR</div></div>
     <div id="rankings-content"></div>
     <button class="btn btn-secondary" id="btn-rankings-back" style="margin-top:12px">返回赛季</button>
   </div>
@@ -134,12 +131,12 @@
     <div class="modal-header"><b>玩法说明</b><button class="help-close" id="help-close">✕</button></div>
     <p style="font-size:14px;line-height:1.6;color:var(--text-dim)">
       1. 创建选手并选择角色（IGL/AWP/Entry/Lurk/Support）<br>
-      2. 13 轮：随机战队 → 选手 → 锁定 1 项属性<br>
-      3. 每轮 5 张现役选手卡，3 次换人<br>
-      4. 18 场联赛 BO1 → 7 项年度赛事（可逐步或一键模拟）<br>
-      5. 赛季页/赛事页可查看<strong>你的 Rating、K/D/A、ADR</strong> 与最近比赛记录<br>
-      6. 排行榜：战队按 <strong>VRS 积分</strong>（初始来自 HLTV Valve 排名），选手综合排名<br>
-      7. 年末公布 Top 20、MVP 等全部奖项 · 随机事件与成就<br>
+      2. 13 轮：随机战队 → 选手 → 锁定 1 项属性（可换战队 3 次）<br>
+      3. 18 场联赛 BO1 → 6 项年度赛事（IEM / BLAST / EPL / Major 等）<br>
+      4. 赛季页可查看 Rating、K/D/A、ADR 与最近比赛<br>
+      5. 排行榜仅展示 VRS / Rating / OVR 数据<br>
+      6. Top 20 需同时满足队伍成绩、个人表现、赛事荣誉<br>
+      7. 年末公布全部奖项 · 冠军/MVP/EVP 可点击查看详情<br>
       <br><b>选手数据说明</b>：Rating 与属性来自 HLTV.org <strong>Big Events · 近 12 个月</strong>（Rating 2.0、ADR、KAST 等）。maps 不足 20 场时会向队内中位数回归，避免小样本虚高；OVR 约 71–90（顶尖 ~90）。<br>
       <b>VRS 说明</b>：初始积分来自 HLTV Valve Regional Standings；赛季内随胜负与赛事成绩动态变化。
     </p>
