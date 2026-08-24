@@ -555,13 +555,19 @@
     b.usedPlayers.add(playerIdentityKey(p));
     b.sourceHistory.push({
       attrKey: key, attrName: C.ATTR_CN[key], value: val, playerName: p.name,
-      playerKind: sourceKindLabel(p), teamId: b.team, penalty: pen
+      playerKind: sourceKindLabel(p), teamId: b.team, penalty: 1
     });
     b.lockCount = Object.keys(b.lockedAttrs).length;
     b.selectedPlayer = null;
     b.mustLockAfterSpin = false;
     showToast(`${C.ATTR_CN[key]} 已锁定：${val}`);
     b.locking = false;
+    renderBuild();
+    const lockedEl = $('bl-attrs') && $('bl-attrs').querySelector(`.ba-slot[data-k="${key}"]`);
+    if (lockedEl) {
+      lockedEl.classList.add('just-locked');
+      setTimeout(() => lockedEl.classList.remove('just-locked'), 500);
+    }
     if (b.lockCount >= C.ATTR_KEYS.length) {
       setTimeout(revealPlayer, 500);
       return;

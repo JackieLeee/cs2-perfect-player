@@ -96,6 +96,12 @@ body {
 .ba-slot.locked { border-color: rgba(245,189,84,.45); background: rgba(245,189,84,.08); }
 .ba-slot.clickable { cursor: pointer; border-color: rgba(93,185,214,.45); }
 .ba-slot.clickable:active { transform: scale(.96); background: rgba(93,185,214,.1); }
+.ba-slot.just-locked { animation: lockPop .45s ease; }
+@keyframes lockPop {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.06); border-color: rgba(245,189,84,.7); box-shadow: 0 0 10px rgba(245,189,84,.35); }
+  100% { transform: scale(1); }
+}
 .ba-label { font-size: 10px; font-weight: 700; color: var(--text-dim); min-width: 22px; flex-shrink: 0; }
 .ba-grade { font-size: 12px; font-weight: 800; min-width: 16px; text-align: center; font-family: var(--font-display); }
 .ba-owner { font-size: 8px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; text-align: right; }

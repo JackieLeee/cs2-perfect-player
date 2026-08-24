@@ -67,11 +67,12 @@ python3 tools/build_cs2_player_pool.py --offline
 
 | 规则 | 说明 |
 |------|------|
-| OVR 公式 | `clamp(52 + effectiveRating × 26)`，顶尖选手约 88–90 |
-| 样本收缩 | maps < 20 时，Rating 向队内可信中位数回归，避免 1–3 场小样本爆表 |
-| 队内中位数 | 仅使用 maps ≥ 20 的队员计算，降低整体虚高 |
+| 属性来源 | 各属性独立映射：`AIM←Rating+ADR+KPR`，`REFL←Rating+Swing`，`UTLY←ADR+KAST`，`TEAM/COMM←KAST` 等 |
+| OVR 公式 | **`OVR = calc_ovr(13项属性, 角色权重)`**，不再由 Rating 直接换算 |
+| HLTV Rating | 存入 `source.hltvRating` / `effectiveRating`；ADR、KAST、K/D、Swing 存入 `source` |
+| 样本收缩 | maps < 20 时 Rating 向队内中位数回归 |
 
-原始 HLTV Rating 保存在 `source.hltvRating`，校准后用于游戏的 Rating 在 `source.effectiveRating` 与 `rating` 字段。
+原始 HLTV 统计保存在 `source`（`hltvRating`、`adr`、`kast`、`kd` 等）；`rating` 为有效 Rating，`ovr` 由 13 项属性加权得出。
 
 ## 测试
 

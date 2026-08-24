@@ -1,33 +1,134 @@
 {
   "version": 1,
   "count": 18,
-  "format": "PNG",
-  "width": 512,
-  "height": 512,
-  "transparent": true,
-  "groups": {
-    "亚洲": 6,
-    "白人": 6,
-    "黑人": 6
-  },
+  "format": "SVG",
+  "generatedAt": "2026-08-24T17:15:20.961776+00:00",
   "avatars": [
-    { "id": "avatar-01", "group": "亚洲", "photoLocal": "assets/images/character-avatars/avatar-01.png" },
-    { "id": "avatar-02", "group": "亚洲", "photoLocal": "assets/images/character-avatars/avatar-02.png" },
-    { "id": "avatar-03", "group": "亚洲", "photoLocal": "assets/images/character-avatars/avatar-03.png" },
-    { "id": "avatar-04", "group": "亚洲", "photoLocal": "assets/images/character-avatars/avatar-04.png" },
-    { "id": "avatar-05", "group": "亚洲", "photoLocal": "assets/images/character-avatars/avatar-05.png" },
-    { "id": "avatar-06", "group": "亚洲", "photoLocal": "assets/images/character-avatars/avatar-06.png" },
-    { "id": "avatar-07", "group": "白人", "photoLocal": "assets/images/character-avatars/avatar-07.png" },
-    { "id": "avatar-08", "group": "白人", "photoLocal": "assets/images/character-avatars/avatar-08.png" },
-    { "id": "avatar-09", "group": "白人", "photoLocal": "assets/images/character-avatars/avatar-09.png" },
-    { "id": "avatar-10", "group": "白人", "photoLocal": "assets/images/character-avatars/avatar-10.png" },
-    { "id": "avatar-11", "group": "白人", "photoLocal": "assets/images/character-avatars/avatar-11.png" },
-    { "id": "avatar-12", "group": "白人", "photoLocal": "assets/images/character-avatars/avatar-12.png" },
-    { "id": "avatar-13", "group": "黑人", "photoLocal": "assets/images/character-avatars/avatar-13.png" },
-    { "id": "avatar-14", "group": "黑人", "photoLocal": "assets/images/character-avatars/avatar-14.png" },
-    { "id": "avatar-15", "group": "黑人", "photoLocal": "assets/images/character-avatars/avatar-15.png" },
-    { "id": "avatar-16", "group": "黑人", "photoLocal": "assets/images/character-avatars/avatar-16.png" },
-    { "id": "avatar-17", "group": "黑人", "photoLocal": "assets/images/character-avatars/avatar-17.png" },
-    { "id": "avatar-18", "group": "黑人", "photoLocal": "assets/images/character-avatars/avatar-18.png" }
+    {
+      "id": "avatar-01",
+      "group": "亚洲",
+      "color": "#ff6b35",
+      "tone": "冷静",
+      "photoLocal": "assets/images/character-avatars/avatar-01.svg"
+    },
+    {
+      "id": "avatar-02",
+      "group": "亚洲",
+      "color": "#00d4aa",
+      "tone": "爆发",
+      "photoLocal": "assets/images/character-avatars/avatar-02.svg"
+    },
+    {
+      "id": "avatar-03",
+      "group": "亚洲",
+      "color": "#4dabf7",
+      "tone": "精准",
+      "photoLocal": "assets/images/character-avatars/avatar-03.svg"
+    },
+    {
+      "id": "avatar-04",
+      "group": "亚洲",
+      "color": "#ffd43b",
+      "tone": "稳健",
+      "photoLocal": "assets/images/character-avatars/avatar-04.svg"
+    },
+    {
+      "id": "avatar-05",
+      "group": "亚洲",
+      "color": "#e64980",
+      "tone": "团队",
+      "photoLocal": "assets/images/character-avatars/avatar-05.svg"
+    },
+    {
+      "id": "avatar-06",
+      "group": "亚洲",
+      "color": "#845ef7",
+      "tone": "领袖",
+      "photoLocal": "assets/images/character-avatars/avatar-06.svg"
+    },
+    {
+      "id": "avatar-07",
+      "group": "欧美",
+      "color": "#339af0",
+      "tone": "冷静",
+      "photoLocal": "assets/images/character-avatars/avatar-07.svg"
+    },
+    {
+      "id": "avatar-08",
+      "group": "欧美",
+      "color": "#51cf66",
+      "tone": "爆发",
+      "photoLocal": "assets/images/character-avatars/avatar-08.svg"
+    },
+    {
+      "id": "avatar-09",
+      "group": "欧美",
+      "color": "#ff922b",
+      "tone": "精准",
+      "photoLocal": "assets/images/character-avatars/avatar-09.svg"
+    },
+    {
+      "id": "avatar-10",
+      "group": "欧美",
+      "color": "#f06595",
+      "tone": "稳健",
+      "photoLocal": "assets/images/character-avatars/avatar-10.svg"
+    },
+    {
+      "id": "avatar-11",
+      "group": "欧美",
+      "color": "#748ffc",
+      "tone": "团队",
+      "photoLocal": "assets/images/character-avatars/avatar-11.svg"
+    },
+    {
+      "id": "avatar-12",
+      "group": "欧美",
+      "color": "#63e6be",
+      "tone": "领袖",
+      "photoLocal": "assets/images/character-avatars/avatar-12.svg"
+    },
+    {
+      "id": "avatar-13",
+      "group": "CIS",
+      "color": "#ffa94d",
+      "tone": "冷静",
+      "photoLocal": "assets/images/character-avatars/avatar-13.svg"
+    },
+    {
+      "id": "avatar-14",
+      "group": "CIS",
+      "color": "#74c0fc",
+      "tone": "爆发",
+      "photoLocal": "assets/images/character-avatars/avatar-14.svg"
+    },
+    {
+      "id": "avatar-15",
+      "group": "CIS",
+      "color": "#a9e34b",
+      "tone": "精准",
+      "photoLocal": "assets/images/character-avatars/avatar-15.svg"
+    },
+    {
+      "id": "avatar-16",
+      "group": "CIS",
+      "color": "#ff6b6b",
+      "tone": "稳健",
+      "photoLocal": "assets/images/character-avatars/avatar-16.svg"
+    },
+    {
+      "id": "avatar-17",
+      "group": "CIS",
+      "color": "#9775fa",
+      "tone": "团队",
+      "photoLocal": "assets/images/character-avatars/avatar-17.svg"
+    },
+    {
+      "id": "avatar-18",
+      "group": "CIS",
+      "color": "#20c997",
+      "tone": "领袖",
+      "photoLocal": "assets/images/character-avatars/avatar-18.svg"
+    }
   ]
 }

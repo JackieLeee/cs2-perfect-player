@@ -13,10 +13,10 @@ import aiohttp
 
 from build_cs2_player_pool import slug
 from hltv_calibration import (
-    anchor_ovr,
-    attrs_from_hltv,
+    build_player_attrs_ovr,
     calibration_rules_note,
     effective_rating,
+    stats_to_source_fields,
     team_median_from_candidates,
 )
 from fetch_cs2_data import ROLE_OVERRIDES, infer_role
@@ -307,9 +307,29 @@ async def build_player_record(
     raw_rating = round(float(stats.get("rating") or ref.get("best_rating") or 1.0), 3)
     maps = int(stats.get("N") or stats.get("maps_played") or stats.get("maps") or 0)
     eff_rating = round(effective_rating(raw_rating, maps, team_median), 3)
-    attrs = attrs_from_hltv(stats, role, eff_rating, peak)
-    ovr = anchor_ovr(eff_rating)
+    attrs, ovr, resolved = build_player_attrs_ovr(stats, None, role, eff_rating, peak)
     start, end = client.stats_start, client.stats_end
+    source = {
+        "kind": kind,
+        "year": CURRENT_YEAR,
+        "label": str(CURRENT_YEAR),
+        "code": 0,
+        "provider": "hltv.org",
+        "hltvPlayerId": pid,
+        "hltvRating": raw_rating,
+        "effectiveRating": eff_rating,
+        "mapsPlayed": maps,
+        "statsWindow": f"{STATS_MONTHS} months",
+        "matchType": MATCH_TYPE,
+        "startDate": start,
+        "endDate": end,
+        "hltvUrl": (
+            f"https://www.hltv.org/stats/players/{pid}/{slug(name)}"
+            f"?startDate={start}&endDate={end}&matchType={MATCH_TYPE}"
+        ),
+        "dataVia": "api.csapi.de",
+        **stats_to_source_fields(resolved),
+    }
     return {
         "name": name,
         "nameCn": name,
@@ -320,26 +340,7 @@ async def build_player_record(
         "age": 22,
         "attrs": attrs,
         "honors": {"majors": 1 if peak else 0, "mvps": 1 if peak and role == "AWP" else 0, "top20": 3 if peak else 0},
-        "source": {
-            "kind": kind,
-            "year": CURRENT_YEAR,
-            "label": str(CURRENT_YEAR),
-            "code": 0,
-            "provider": "hltv.org",
-            "hltvPlayerId": pid,
-            "hltvRating": raw_rating,
-            "effectiveRating": eff_rating,
-            "mapsPlayed": maps,
-            "statsWindow": f"{STATS_MONTHS} months",
-            "matchType": MATCH_TYPE,
-            "startDate": start,
-            "endDate": end,
-            "hltvUrl": (
-                f"https://www.hltv.org/stats/players/{pid}/{slug(name)}"
-                f"?startDate={start}&endDate={end}&matchType={MATCH_TYPE}"
-            ),
-            "dataVia": "api.csapi.de",
-        },
+        "source": source,
         "historicalPeak": peak,
         "peakRating": ovr if peak else None,
         "photo": f"assets/images/players/{team_id}/{slug(name)}.svg",

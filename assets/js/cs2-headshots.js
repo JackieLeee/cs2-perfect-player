@@ -24,8 +24,10 @@
 
   function resolvePlayerPhoto(p) {
     if (!p) return '';
-    if (p.photo) return p.photo;
-    return PHOTOS[playerPhotoKey(p)] || '';
+    const key = playerPhotoKey(p);
+    if (PHOTOS[key]) return PHOTOS[key];
+    if (!manifestLoaded && p.photo) return p.photo;
+    return '';
   }
 
   function headshotStyle(p, size) {

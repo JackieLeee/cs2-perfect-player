@@ -1,16 +1,33 @@
-"""Shared HLTV rating → OVR/attrs calibration (Big Events · 12 months)."""
+"""Shared HLTV stats → 13 attrs → OVR calibration (Big Events · 12 months)."""
 from __future__ import annotations
 
 from typing import Any
 
 from build_cs2_player_pool import ATTR_KEYS, ROLE_ATTR_BIAS, calc_ovr, clamp
 
-# HLTV 选手页通常要求一定样本量；低于此值向队内中位数回归，避免 1–3 场爆表。
 MIN_MAPS_TRUST = 20
+
+# HLTV Big Events 职业池参考均值（Rating 2.0 口径）
+HLTV_MEAN = {
+    "rating": 1.05,
+    "adr": 75.0,
+    "kast": 72.0,
+    "kpr": 0.72,
+    "kd": 1.05,
+    "swing": 0.0,
+}
+
+# 角色对 ADR/KAST/K/D 的 typical 偏移（无明细统计时用于推断）
+ROLE_STAT_PROFILE: dict[str, dict[str, float]] = {
+    "AWP": {"adr": 0.98, "kast": 1.02, "kpr": 1.06, "kd": 1.08, "swing": 0.9},
+    "IGL": {"adr": 0.88, "kast": 1.08, "kpr": 0.88, "kd": 0.92, "swing": 0.7},
+    "Entry": {"adr": 1.06, "kast": 0.96, "kpr": 1.12, "kd": 1.02, "swing": 1.1},
+    "Lurk": {"adr": 1.02, "kast": 1.04, "kpr": 1.0, "kd": 1.06, "swing": 1.15},
+    "Support": {"adr": 0.92, "kast": 1.10, "kpr": 0.86, "kd": 0.95, "swing": 0.75},
+}
 
 
 def team_median_from_candidates(candidates: list[dict[str, Any]], stats_by_pid: dict[int, dict[str, Any]]) -> float:
-    """Median raw rating using only players with enough maps (avoids small-sample inflation)."""
     trusted: list[float] = []
     for c in candidates:
         pid = int(c.get("id") or 0)
@@ -24,11 +41,6 @@ def team_median_from_candidates(candidates: list[dict[str, Any]], stats_by_pid: 
         return trusted[len(trusted) // 2]
     fallback = sorted(float(c.get("best_rating") or 0) for c in candidates if float(c.get("best_rating") or 0) > 0)
     return fallback[len(fallback) // 2] if fallback else 1.05
-
-
-def anchor_ovr(hltv_rating: float) -> int:
-    """Map HLTV Rating 2.0 to game OVR (avg pro ~1.05 → ~81, elite ~1.25 → ~87)."""
-    return clamp(int(round(53 + float(hltv_rating) * 27)))
 
 
 def shrink_rating(raw: float, maps: int, fallback: float) -> float:
@@ -50,65 +62,128 @@ def effective_rating(
     return shrink_rating(raw, maps, fallback)
 
 
+def _scale(value: float, baseline: float, per_unit: float, center: int = 66) -> int:
+    return clamp(int(round(center + (float(value) - baseline) * per_unit)))
+
+
+def resolve_hltv_stats(
+    stats: dict[str, Any] | None,
+    src: dict[str, Any] | None,
+    rating: float,
+    role: str,
+) -> dict[str, float]:
+    """Merge match aggregates / source fields; infer missing fields from rating + role."""
+    stats = dict(stats or {})
+    src = dict(src or {})
+    r = float(stats.get("rating") or src.get("effectiveRating") or src.get("hltvRating") or rating)
+    prof = ROLE_STAT_PROFILE.get(role, ROLE_STAT_PROFILE["Entry"])
+    rt = r - HLTV_MEAN["rating"]
+
+    adr = stats.get("adr")
+    if adr is None:
+        adr = src.get("adr")
+    if adr is None:
+        adr = HLTV_MEAN["adr"] + rt * 38 * prof["adr"]
+
+    kast = stats.get("kast")
+    if kast is None:
+        kast = src.get("kast")
+    if kast is None:
+        kast = HLTV_MEAN["kast"] + rt * 14 * prof["kast"]
+
+    k = stats.get("k")
+    if k is None:
+        k = src.get("k")
+    if k is None:
+        k = 14.0 + rt * 7.5 * prof["kpr"]
+
+    d = stats.get("d")
+    if d is None:
+        d = src.get("d")
+    if d is None:
+        d = max(14.0 - rt * 2.5 * (2.0 - prof["kd"]), 0.1)
+
+    swing = stats.get("swing")
+    if swing is None:
+        swing = src.get("swing")
+    if swing is None:
+        swing = rt * 0.75 * prof["swing"]
+
+    k = float(k)
+    d = max(float(d), 0.1)
+    return {
+        "rating": r,
+        "adr": float(adr),
+        "kast": float(kast),
+        "k": k,
+        "d": d,
+        "swing": float(swing),
+        "kpr": k / 24.0,
+        "kd": k / d,
+    }
+
+
+def stats_to_source_fields(st: dict[str, float]) -> dict[str, Any]:
+    return {
+        "adr": round(st["adr"], 2),
+        "kast": round(st["kast"], 2),
+        "swing": round(st["swing"], 3),
+        "k": round(st["k"], 2),
+        "d": round(st["d"], 2),
+        "kpr": round(st["kpr"], 3),
+        "kd": round(st["kd"], 3),
+    }
+
+
 def attrs_from_hltv(stats: dict[str, Any], role: str, rating: float, peak: bool = False) -> dict[str, int]:
-    """Build attrs centered on anchor_ovr(rating) with modest stat-driven spread."""
-    target = anchor_ovr(rating)
-    adr = float(stats.get("adr") or 75.0)
-    kast = float(stats.get("kast") or 72.0)
-    swing = float(stats.get("swing") or 0.0)
-    k = float(stats.get("k") or 14.0)
-    d = max(float(stats.get("d") or 14.0), 0.1)
-    kd = k / d
-    kpr = k / 24.0
-    rt = rating - 1.0
+    """Map HLTV Rating / ADR / KAST / K-D / Swing to 13 distinct attributes."""
+    st = resolve_hltv_stats(stats, None, rating, role)
+
+    rn = _scale(st["rating"], HLTV_MEAN["rating"], 58)
+    adr_n = _scale(st["adr"], HLTV_MEAN["adr"], 1.05)
+    kast_n = _scale(st["kast"], HLTV_MEAN["kast"], 1.28)
+    kpr_n = _scale(st["kpr"], HLTV_MEAN["kpr"], 82)
+    kd_n = _scale(st["kd"], HLTV_MEAN["kd"], 34)
+    swing_n = _scale(st["swing"], HLTV_MEAN["swing"], 12)
 
     attrs: dict[str, int] = {
-        "AIM": clamp(target + int(rt * 5 + (adr - 75) * 0.05)),
-        "REFL": clamp(target + int(rt * 4 + swing * 0.4)),
-        "SPRY": clamp(target + int((kpr - 0.72) * 8 + rt * 3)),
-        "AWPE": clamp(target + int((kpr - 0.72) * 10 + (adr - 75) * 0.04)),
-        "UTLY": clamp(target + int((adr - 75) * 0.08 + (kast - 72) * 0.06)),
-        "GMSN": clamp(target + int((kast - 72) * 0.08 + rt * 3)),
-        "COMM": clamp(target + int((kast - 72) * 0.07 + rt * 2)),
-        "CLUT": clamp(target + int(rt * 4 + (kd - 1.0) * 3)),
-        "ENTR": clamp(target + int((kpr - 0.72) * 10 + rt * 3)),
-        "LURK": clamp(target + int(rt * 4 + swing * 0.3)),
-        "TEAM": clamp(target + int((kast - 72) * 0.08 + rt * 2)),
-        "MENT": clamp(target + int(rt * 4 + (kast - 72) * 0.04)),
-        "CONS": clamp(target + int((kast - 72) * 0.06 + (1 - abs(kd - 1.05)) * 2)),
+        "AIM": clamp(int(rn * 0.38 + adr_n * 0.34 + kpr_n * 0.28)),
+        "REFL": clamp(int(rn * 0.52 + swing_n * 0.48)),
+        "SPRY": clamp(int(kpr_n * 0.42 + rn * 0.33 + adr_n * 0.25)),
+        "AWPE": clamp(int(kpr_n * 0.48 + adr_n * 0.32 + rn * 0.20)),
+        "UTLY": clamp(int(adr_n * 0.52 + kast_n * 0.48)),
+        "GMSN": clamp(int(kast_n * 0.52 + rn * 0.28 + swing_n * 0.20)),
+        "COMM": clamp(int(kast_n * 0.55 + rn * 0.25 + kd_n * 0.20)),
+        "CLUT": clamp(int(kd_n * 0.38 + rn * 0.42 + swing_n * 0.20)),
+        "ENTR": clamp(int(kpr_n * 0.46 + adr_n * 0.34 + rn * 0.20)),
+        "LURK": clamp(int(swing_n * 0.38 + kast_n * 0.32 + rn * 0.30)),
+        "TEAM": clamp(int(kast_n * 0.62 + rn * 0.18 + (100 - abs(kd_n - 58)) * 0.20)),
+        "MENT": clamp(int(kast_n * 0.42 + rn * 0.33 + kd_n * 0.25)),
+        "CONS": clamp(int(kast_n * 0.48 + (100 - abs(kd_n - 58)) * 0.32 + rn * 0.20)),
     }
+
     for k_attr, bonus in ROLE_ATTR_BIAS.get(role, {}).items():
-        attrs[k_attr] = clamp(attrs[k_attr] + bonus // 4)
+        attrs[k_attr] = clamp(attrs[k_attr] + bonus // 2)
+
     if peak:
         for k_attr in attrs:
             attrs[k_attr] = clamp(attrs[k_attr] + 2)
 
-    # Nudge so role-weighted OVR matches anchor (usually within 1–2).
-    tuned = calc_ovr(attrs, role)
-    if tuned != target:
-        delta = target - tuned
-        weights = _role_weights(role)
-        for k_attr in sorted(ATTR_KEYS, key=lambda k: -weights.get(k, 0.05)):
-            if delta == 0:
-                break
-            step = 1 if delta > 0 else -1
-            attrs[k_attr] = clamp(attrs[k_attr] + step)
-            delta -= step
     return attrs
 
 
-def _role_weights(role: str) -> dict[str, float]:
-    from build_cs2_player_pool import calc_ovr as _  # noqa: F401
-
-    weights = {
-        "IGL": {"COMM": 0.14, "GMSN": 0.12, "TEAM": 0.10, "MENT": 0.08, "AIM": 0.08},
-        "AWP": {"AWPE": 0.16, "AIM": 0.14, "REFL": 0.10, "CLUT": 0.10, "GMSN": 0.08},
-        "Entry": {"ENTR": 0.14, "AIM": 0.14, "REFL": 0.10, "SPRY": 0.08, "CLUT": 0.08},
-        "Lurk": {"LURK": 0.14, "GMSN": 0.12, "CLUT": 0.10, "AIM": 0.10, "CONS": 0.08},
-        "Support": {"UTLY": 0.14, "TEAM": 0.12, "GMSN": 0.10, "COMM": 0.08, "MENT": 0.08},
-    }
-    base = weights.get(role, weights["Entry"])
-    return {k: base.get(k, 0.05) for k in ATTR_KEYS}
+def build_player_attrs_ovr(
+    stats: dict[str, Any],
+    src: dict[str, Any] | None,
+    role: str,
+    eff_rating: float,
+    peak: bool = False,
+) -> tuple[dict[str, int], int, dict[str, float]]:
+    """Returns attrs, ovr (from calc_ovr), resolved HLTV stats."""
+    merged = resolve_hltv_stats(stats, src, eff_rating, role)
+    attrs = attrs_from_hltv(merged, role, eff_rating, peak)
+    ovr = calc_ovr(attrs, role)
+    return attrs, ovr, merged
 
 
 def collect_rating_medians(pool: dict) -> tuple[dict[str, float], float]:
@@ -152,12 +227,27 @@ def collect_rating_medians(pool: dict) -> tuple[dict[str, float], float]:
 
 def calibration_rules_note() -> dict[str, Any]:
     return {
-        "version": 5,
-        "method": "HLTV Rating 2.0 + sample shrinkage + tightened OVR anchor",
-        "ovrFormula": f"OVR ≈ clamp(53 + effectiveRating × 27); maps<{MIN_MAPS_TRUST} regresses to team median",
-        "ratingFormula": "HLTV Rating 2.0 (Big Events match aggregation)",
+        "version": 6,
+        "method": "HLTV stats → 13 attrs → role-weighted OVR",
+        "ovrFormula": "OVR = calc_ovr(attrs, role); attrs from Rating/ADR/KAST/K-D/Swing",
+        "ratingFormula": "HLTV Rating 2.0 (effectiveRating after sample shrinkage)",
         "statsWindow": "12 months",
         "provider": "hltv.org",
         "minMapsTrust": MIN_MAPS_TRUST,
-        "note": "低样本 Rating 向队内中位数回归，避免少量场次虚高；OVR 上限约 90（顶尖 1.40+）。",
+        "attrDrivers": {
+            "AIM": "Rating + ADR + KPR",
+            "REFL": "Rating + Swing",
+            "SPRY": "KPR + Rating + ADR",
+            "AWPE": "KPR + ADR",
+            "UTLY": "ADR + KAST",
+            "GMSN": "KAST + Rating",
+            "COMM": "KAST + Rating",
+            "CLUT": "K/D + Rating",
+            "ENTR": "KPR + ADR",
+            "LURK": "Swing + KAST",
+            "TEAM": "KAST",
+            "MENT": "KAST + K/D",
+            "CONS": "KAST + stability",
+        },
+        "note": "OVR 由 13 项属性按角色权重加权得出；属性各自由 HLTV 统计独立映射。",
     }

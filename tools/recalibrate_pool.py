@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Recalibrate OVR/attrs in cs2-player-pool.json from stored HLTV ratings (no network)."""
+"""Recalibrate OVR/attrs in cs2-player-pool.json from stored HLTV stats (no network)."""
 from __future__ import annotations
 
 import json
@@ -12,11 +12,11 @@ POOL_PATH = DATA / "cs2-player-pool.json"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from hltv_calibration import (  # noqa: E402
-    anchor_ovr,
-    attrs_from_hltv,
+    build_player_attrs_ovr,
     calibration_rules_note,
     collect_rating_medians,
     effective_rating,
+    stats_to_source_fields,
 )
 
 
@@ -35,17 +35,17 @@ def recalibrate_player(p: dict, team_medians: dict[str, float], global_med: floa
     src["provider"] = "hltv.org"
     if maps < 20 and raw is not None and abs(eff - float(raw)) > 0.02:
         src["ratingShrunk"] = True
+    else:
+        src.pop("ratingShrunk", None)
+
+    attrs, ovr, resolved = build_player_attrs_ovr({}, src, role, eff, bool(p.get("historicalPeak")))
+    src.update(stats_to_source_fields(resolved))
+    if not src.get("adr") and resolved.get("adr"):
+        src["statsInferred"] = True
+
     p["source"] = src
-    stats = {
-        "adr": src.get("adr") or 75,
-        "kast": src.get("kast") or 72,
-        "swing": src.get("swing") or 0,
-        "k": src.get("k") or 14,
-        "d": src.get("d") or 14,
-    }
-    peak = bool(p.get("historicalPeak"))
-    p["attrs"] = attrs_from_hltv(stats, role, eff, peak)
-    p["ovr"] = anchor_ovr(eff)
+    p["attrs"] = attrs
+    p["ovr"] = ovr
     p["rating"] = round(eff, 2)
     return p
 
@@ -73,21 +73,20 @@ def main() -> None:
     for t in pool["teams"].values():
         players.extend(t.get("players") or [])
     ovrs = sorted(p["ovr"] for p in players)
+    spreads = []
+    for p in players:
+        vals = list((p.get("attrs") or {}).values())
+        if vals:
+            spreads.append(max(vals) - min(vals))
     print(f"Recalibrated {len(players)} players")
     print(f"OVR range: {ovrs[0]}–{ovrs[-1]}, avg {sum(ovrs)/len(ovrs):.1f}")
-    top = sorted(players, key=lambda x: -x["ovr"])[:12]
+    print(f"Attr spread avg {sum(spreads)/len(spreads):.1f}, min {min(spreads)}, max {max(spreads)}")
+    top = sorted(players, key=lambda x: -x["ovr"])[:8]
     for i, p in enumerate(top, 1):
         src = p.get("source") or {}
-        print(
-            f"  {i:2}. {p['name']:12} OVR {p['ovr']} eff {p['rating']} "
-            f"raw {src.get('hltvRating')} maps {src.get('mapsPlayed')}"
-        )
-    shrunk = [p for p in players if (p.get("source") or {}).get("ratingShrunk")]
-    if shrunk:
-        print(f"\nSample shrunk ({len(shrunk)} total):")
-        for p in sorted(shrunk, key=lambda x: -(x.get("source") or {}).get("hltvRating", 0))[:8]:
-            src = p.get("source") or {}
-            print(f"  {p['name']:12} raw {src.get('hltvRating')} -> eff {p['rating']} maps {src.get('mapsPlayed')}")
+        a = p.get("attrs") or {}
+        spread = max(a.values()) - min(a.values()) if a else 0
+        print(f"  {i:2}. {p['name']:12} OVR {p['ovr']} rtg {p['rating']} spread {spread}")
 
 
 if __name__ == "__main__":
